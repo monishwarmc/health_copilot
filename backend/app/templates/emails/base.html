@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ app_name }}</title>
+</head>
+
+<body
+    style="
+        font-family: Arial, sans-serif;
+        background:#f5f5f5;
+        padding:40px;
+    "
+>
+
+<div
+    style="
+        max-width:600px;
+        background:white;
+        margin:auto;
+        padding:40px;
+        border-radius:10px;
+    "
+>
+
+{% block content %}
+{% endblock %}
+
+</div>
+
+<hr>
+
+<p style="font-size:12px;color:#888;">
+© {{ year }} {{ app_name }}
+
+<br><br>
+
+This is an automated email. Please don't reply.
+</p>
+
+</body>
+</html>
