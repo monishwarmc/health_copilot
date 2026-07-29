@@ -98,7 +98,7 @@ class AuthService:
         token = create_email_verification_token(user.email)
 
         verification_url = (
-            f"https://health-copilot-rouge.vercel.app/verify-email?token={token}"
+            f"{settings.FRONTEND_URL}/verify-email?token={token}"
         )
 
         email_service.send_verification_email(
