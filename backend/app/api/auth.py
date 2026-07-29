@@ -15,7 +15,6 @@ from app.services.auth_service import auth_service
 
 from app.dependencies import get_current_user
 from app.models.user import User
-from fastapi.responses import FileResponse
 from app.schemas.user import UserResponse
 
 
@@ -24,9 +23,6 @@ router = APIRouter(
     tags=["Authentication"],
 )
 
-@router.get("/favicon.ico", include_in_schema=False)
-async def favicon():
-    return FileResponse("static/favicon.ico")
 
 
 @router.post(
