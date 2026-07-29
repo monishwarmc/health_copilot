@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     "therapist-becoming-stage-hear.trycloudflare.com",
     "lh3.googleusercontent.com",
     "https://health-copilot-029n.onrender.com",
-    "https://health-copilot-luxe-chi.vercel.app"
+    "https://health-copilot-rouge.vercel.app"
   ],
   images: {
     remotePatterns: [
