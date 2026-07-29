@@ -65,8 +65,8 @@ function profile() {
         color='warning'
         variant='contained'
         size='small'
+        fullWidth
         sx={{
-          width:"9vw",
           alignSelf: "center"
         }}
         onClick={logout}
