@@ -4,7 +4,9 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "10.166.237.222",
     "therapist-becoming-stage-hear.trycloudflare.com",
-    "lh3.googleusercontent.com"
+    "lh3.googleusercontent.com",
+    "https://health-copilot-029n.onrender.com",
+    "https://health-copilot-luxe-chi.vercel.app"
   ],
   images: {
     remotePatterns: [
