@@ -102,6 +102,7 @@ export function AuthProvider({
           email,
           password,
       });
+      console.log(response)
 
       return response.data.message;
   };
