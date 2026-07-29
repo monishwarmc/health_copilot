@@ -132,6 +132,7 @@ export default function LoginForm() {
                 variant="outlined"
                 href="/register"
                 size="small"
+                fullWidth
                 endIcon={<PersonAddAltIcon/>}
             >Register</Button>
             </Typography>

@@ -150,6 +150,7 @@ export default function RegisterForm() {
                     variant="outlined"
                     href="/login"
                     size="small"
+                    fullWidth
                     endIcon={<LoginIcon/>}
                 >Login</Button>
                 </Typography>
