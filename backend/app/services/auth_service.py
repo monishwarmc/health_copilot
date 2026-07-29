@@ -95,16 +95,6 @@ class AuthService:
             is_verified=False
         )
 
-        user = user_repository.create(
-            db,
-            user,
-        )
-        
-        logger.info(
-            "New user registered: %s",
-            user.email,
-        )
-
         token = create_email_verification_token(user.email)
 
         verification_url = (
@@ -115,6 +105,16 @@ class AuthService:
             to_email=user.email,
             full_name=user.full_name,
             verification_url=verification_url,
+        )
+        
+        user = user_repository.create(
+                    db,
+                    user,
+                )
+                
+        logger.info(
+            "New user registered: %s",
+            user.email,
         )
 
         return MessageResponse(
