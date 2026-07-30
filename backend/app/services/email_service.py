@@ -56,6 +56,24 @@ class EmailService:
             subject="Verify your Health Copilot account",
             html=html,
         )
+        
+    def send_password_reset_email(
+            self,
+            to_email: str,
+            full_name: str,
+            verification_url: str,
+        )-> None:
+            html = self._render_template(
+                "reset_password.html",
+                name=full_name,
+                verification_url=verification_url,
+            )
+    
+            self._send_email(
+                to_email=to_email,
+                subject="Reset your password of Health Copilot account",
+                html=html,
+            )
 
     def _send_email(
         self,

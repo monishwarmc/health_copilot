@@ -43,3 +43,13 @@ class MessageResponse(BaseModel):
     
 class VerifyEmailRequest(BaseModel):
     token: str
+    
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+    
+class ResetPasswordRequest(BaseModel):
+    token: TokenResponse
+    new_password: str = Field(
+        min_length=8,
+        max_length=128
+    )

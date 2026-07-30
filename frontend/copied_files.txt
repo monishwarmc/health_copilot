@@ -1,0 +1,2358 @@
+====================================================================================================
+FILE: AGENTS.md
+====================================================================================================
+
+<!-- BEGIN:nextjs-agent-rules -->
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+<!-- END:nextjs-agent-rules -->
+
+
+
+====================================================================================================
+FILE: CLAUDE.md
+====================================================================================================
+
+@AGENTS.md
+
+
+
+====================================================================================================
+FILE: README.md
+====================================================================================================
+
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+
+====================================================================================================
+FILE: app/(auth)/check-email/page.tsx
+====================================================================================================
+
+"use client";
+
+import Link from "next/link";
+
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+
+import MarkEmailReadIcon from "@mui/icons-material/MarkEmailRead";
+import LoginIcon from "@mui/icons-material/Login";
+
+export default function CheckEmailPage() {
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        px: 2,
+      }}
+    >
+      <Paper
+        elevation={4}
+        sx={{
+          p: 5,
+          width: "100%",
+          maxWidth: 500,
+          borderRadius: 3,
+        }}
+      >
+        <Stack spacing={3} 
+        sx={{
+          alignItems: "center"
+        }}
+        >
+          <MarkEmailReadIcon
+            color="primary"
+            sx={{ fontSize: 70 }}
+          />
+
+          <Typography
+            variant="h4"
+            sx={{
+              textAlign:"center",
+              fontWeight:700
+            }}
+          >
+            Check Your Email
+          </Typography>
+
+          <Typography
+            variant="body1"
+            color="text.secondary"
+            sx={{
+              textAlign:"center"
+            }}
+          >
+            Your account has been created successfully.
+          </Typography>
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              textAlign:"center"
+            }}
+          >
+            We've sent a verification email to your inbox.
+            <br />
+            Please click the verification link before logging in.
+          </Typography>
+
+          <Button
+            component={Link}
+            href="/login"
+            variant="contained"
+            startIcon={<LoginIcon />}
+            fullWidth
+          >
+            Go to Login
+          </Button>
+        </Stack>
+      </Paper>
+    </Box>
+  );
+}
+
+
+====================================================================================================
+FILE: app/(auth)/layout.tsx
+====================================================================================================
+
+import { ReactNode } from "react";
+
+import PublicRoute from "@/components/auth/PublicRoute";
+
+interface AuthLayoutProps {
+  children: ReactNode;
+}
+
+export default function AuthLayout({
+  children,
+}: AuthLayoutProps) {
+  return (
+    <PublicRoute>
+      {children}
+    </PublicRoute>
+  );
+}
+
+
+====================================================================================================
+FILE: app/(auth)/login/page.tsx
+====================================================================================================
+
+import LoginForm from '@/components/forms/LoginForm'
+import AuthCard from '@/components/ui/AuthCard'
+
+
+function login() {
+  return (
+    <AuthCard
+    title="Welcome Back"
+    subtitle="Sign in to continue your personalized health journey."
+    >
+      <LoginForm/>
+    </AuthCard>
+  )
+}
+
+export default login
+
+
+====================================================================================================
+FILE: app/(auth)/register/page.tsx
+====================================================================================================
+
+import RegisterForm from '@/components/forms/RegisterForm'
+import AuthCard from '@/components/ui/AuthCard'
+
+
+function register() {
+  return (
+    <AuthCard
+      title='Create Account'
+      subtitle="Create your Health Copilot account to start your healthy journey"
+    >
+      <RegisterForm/>
+    </AuthCard>
+  )
+}
+
+export default register
+
+
+====================================================================================================
+FILE: app/(auth)/verify-email/page.tsx
+====================================================================================================
+
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ErrorIcon from "@mui/icons-material/Error";
+import LoginIcon from "@mui/icons-material/Login";
+
+import { useAuth } from "@/context/AuthContext";
+
+export default function VerifyEmailPage() {
+  const searchParams = useSearchParams();
+
+  const token = searchParams.get("token");
+
+  const { verifyEmail } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+
+  const [success, setSuccess] = useState(false);
+
+  const [message, setMessage] = useState(
+    "Verifying your email..."
+  );
+
+  useEffect(() => {
+    const verify = async () => {
+      if (!token) {
+        setLoading(false);
+        setSuccess(false);
+        setMessage("Invalid verification link.");
+        return;
+      }
+
+      try {
+        const response = await verifyEmail(token);
+
+        setSuccess(true);
+        setMessage(response);
+      } catch {
+        setSuccess(false);
+        setMessage(
+          "Verification failed. The link may be invalid or expired."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    verify();
+  }, [token, verifyEmail]);
+
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        px: 2,
+      }}
+    >
+      <Paper
+        elevation={4}
+        sx={{
+          p: 5,
+          width: "100%",
+          maxWidth: 500,
+          borderRadius: 3,
+        }}
+      >
+        <Stack 
+        spacing={3} 
+        sx={{
+            alignItems:"center"
+        }}
+        >
+          {loading ? (
+            <>
+              <CircularProgress />
+
+              <Typography
+                variant="h5"
+                sx={{
+                    fontWeight:600
+                }}
+              >
+                Verifying...
+              </Typography>
+
+              <Typography
+                color="text.secondary"
+                sx={{
+                    textAlign: "center"
+                }}
+              >
+                Please wait while we verify your email.
+              </Typography>
+            </>
+          ) : success ? (
+            <>
+              <CheckCircleIcon
+                color="success"
+                sx={{ fontSize: 70 }}
+              />
+
+              <Typography
+                variant="h4"
+                sx={{
+                    textAlign: "center",
+                    fontWeight: 700
+                }}
+              >
+                Email Verified
+              </Typography>
+
+              <Typography
+                color="text.secondary"
+                sx={{
+                    textAlign: "center"
+                }}
+              >
+                {message}
+              </Typography>
+
+              <Button
+                component={Link}
+                href="/login"
+                variant="contained"
+                startIcon={<LoginIcon />}
+                fullWidth
+              >
+                Continue to Login
+              </Button>
+            </>
+          ) : (
+            <>
+              <ErrorIcon
+                color="error"
+                sx={{ fontSize: 70 }}
+              />
+
+              <Typography
+                variant="h4"
+                sx={{
+                    textAlign:"center",
+                    fontWeight:700
+                }}
+              >
+                Verification Failed
+              </Typography>
+
+              <Typography
+                color="text.secondary"
+                sx={{
+                    textAlign: "center"
+                }}
+              >
+                {message}
+              </Typography>
+
+              <Button
+                component={Link}
+                href="/login"
+                variant="contained"
+                fullWidth
+              >
+                Back to Login
+              </Button>
+            </>
+          )}
+        </Stack>
+      </Paper>
+    </Box>
+  );
+}
+
+
+====================================================================================================
+FILE: app/(dashboard)/chat/page.tsx
+====================================================================================================
+
+import Loading from '@/components/ui/Loading'
+
+function page() {
+  return (
+    <Loading title='please wait'/>
+  )
+}
+
+export default page
+
+
+====================================================================================================
+FILE: app/(dashboard)/dashboard/page.tsx
+====================================================================================================
+
+import React from 'react'
+
+function page() {
+  return (
+    <div>dashboard</div>
+  )
+}
+
+export default page
+
+
+====================================================================================================
+FILE: app/(dashboard)/layout.tsx
+====================================================================================================
+
+import { ReactNode } from "react";
+
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import profile from "@/app/(dashboard)/profile/page"
+
+interface DashboardLayoutProps {
+  children: ReactNode;
+}
+
+export default function DashboardLayout({
+  children,
+}: DashboardLayoutProps) {
+  return (
+    <ProtectedRoute>
+      {children}
+    </ProtectedRoute>
+  );
+}
+
+
+====================================================================================================
+FILE: app/(dashboard)/nutrition/page.tsx
+====================================================================================================
+
+import React from 'react'
+
+function page() {
+  return (
+    <div>nutrition</div>
+  )
+}
+
+export default page
+
+
+====================================================================================================
+FILE: app/(dashboard)/profile/page.tsx
+====================================================================================================
+
+"use client"
+
+import AuthCard from '@/components/ui/AuthCard'
+import Typography from "@mui/material/Typography";
+import Stack from "@mui/material/Stack";
+
+import { useAuth } from "@/context/AuthContext";
+import Button from '@mui/material/Button';
+import Image from 'next/image';
+
+import LogoutIcon from '@mui/icons-material/Logout';
+
+function profile() {
+
+  const { user, logout } = useAuth();
+
+  // Helper function to format ISO date string to "Day, Date Time"
+  const formatDateTimeDay = (dateString?: string) => {
+    if (!dateString) return "";
+    
+    const date = new Date(dateString);
+
+    return date.toLocaleString("en-US", {
+      weekday: "long",   // e.g., "Saturday"
+      year: "numeric",   // e.g., "2026"
+      month: "short",    // e.g., "Jul"
+      day: "numeric",    // e.g., "25"
+      hour: "2-digit",   // e.g., "09"
+      minute: "2-digit", // e.g., "50"
+      second: "2-digit", // e.g., "41"
+      hour12: true,      // e.g., "PM"
+    });
+  };
+
+  return (
+    <AuthCard
+      title={""+user?.full_name}
+      subtitle={""+user?.email}
+    >
+      <Stack
+        direction={"column"}
+        spacing={2}
+        sx={{
+          alignItems: "center",
+          justifyContent: "center"
+        }}
+      >
+        {user?.profile_picture && (
+          <Image
+            src={user.profile_picture}
+            alt='profile pic'
+            width={48}
+            height={48}
+            style={{ borderRadius: '50%' }} // Optional: makes it circular
+          />
+        )}
+        <Typography variant="h6">
+          {formatDateTimeDay(user?.created_at)}
+        </Typography>
+        <Typography variant="h6">
+          {user?.id}
+        </Typography>
+      </Stack>
+      <Button 
+        color='warning'
+        variant='contained'
+        size='small'
+        fullWidth
+        sx={{
+          alignSelf: "center"
+        }}
+        onClick={logout}
+        endIcon={<LogoutIcon/>}
+        >
+          Logout
+      </Button>
+    </AuthCard>
+  )
+}
+
+export default profile
+
+
+====================================================================================================
+FILE: app/(dashboard)/weight/page.tsx
+====================================================================================================
+
+import React from 'react'
+
+function page() {
+  return (
+    <div>weight</div>
+  )
+}
+
+export default page
+
+
+====================================================================================================
+FILE: app/(dashboard)/workout/page.tsx
+====================================================================================================
+
+import React from 'react'
+
+function page() {
+  return (
+    <div>workout</div>
+  )
+}
+
+export default page
+
+
+====================================================================================================
+FILE: app/globals.css
+====================================================================================================
+
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+
+
+====================================================================================================
+FILE: app/layout.tsx
+====================================================================================================
+
+import type { Metadata } from "next";
+import "./globals.css";
+import ThemeProvider from "@/components/ui/ThemeProvider";
+import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
+import { Toaster } from "react-hot-toast";
+import { AuthProvider } from "@/context/AuthContext";
+import Script from "next/script";
+
+
+export const metadata: Metadata = {
+  title: "Health Copilot",
+  description: "Health and fitness AI assistant",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html
+      lang="en"
+    >
+      <body>
+        <Script
+          src="https://accounts.google.com/gsi/client"
+          strategy="beforeInteractive"
+        />
+        <AppRouterCacheProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                  {children}
+              <Toaster
+                position="top-right"
+                reverseOrder={false}
+              />
+              </AuthProvider>
+            </ThemeProvider>
+        </AppRouterCacheProvider>
+        </body>
+    </html>
+  );
+}
+
+
+
+====================================================================================================
+FILE: app/not-found.tsx
+====================================================================================================
+
+// app/not-found.tsx
+import Link from 'next/link';
+
+export default function NotFound() {
+  return (
+    <div style={styles.container}>
+      <h2 style={styles.heading}>404 - Not Found</h2>
+      <p style={styles.text}>Could not find the requested resource.</p>
+      <Link href="/" style={styles.button}>
+        Return Home
+      </Link>
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100vh',
+    textAlign: 'center' as const,
+    backgroundColor: '#f8f9fa',
+    fontFamily: 'sans-serif',
+  },
+  heading: {
+    fontSize: '2.5rem',
+    color: '#333',
+    marginBottom: '1rem',
+  },
+  text: {
+    fontSize: '1.2rem',
+    color: '#666',
+    marginBottom: '2rem',
+  },
+  button: {
+    padding: '0.75rem 1.5rem',
+    backgroundColor: '#0070f3',
+    color: '#fff',
+    textDecoration: 'none',
+    borderRadius: '5px',
+    fontWeight: 'bold',
+    transition: 'background-color 0.2s',
+  },
+};
+
+
+
+====================================================================================================
+FILE: app/page.tsx
+====================================================================================================
+
+"use client";
+
+import Button from "@mui/material/Button";
+import PersonAddAltIcon from "@mui/icons-material/PersonAddAlt";
+import LoginIcon from "@mui/icons-material/Login";
+import Stack from "@mui/material/Stack";
+import Logo from "@/components/ui/Logo";
+
+export default function Home() {
+  return (
+    <Stack 
+      direction="row" 
+      sx={{ 
+        justifyContent: "space-between", 
+        alignItems: "center",
+        py: "3vh",
+        px: { xs: 2, sm: 4, md: 8 }, // Dynamic padding prevents screen edge hugging
+        width: "100%",
+        maxWidth: "1200px", // Prevents header from stretching too wide on massive screens
+        mx: "auto" // Centers the entire header container
+      }}
+    >
+      <Logo />
+      <Stack direction="column" spacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Button 
+          variant="outlined" 
+          href="/login" 
+          size="small" 
+          endIcon={<LoginIcon />}
+        >
+          Login
+        </Button>
+        <Button 
+          variant="contained" 
+          href="/register" 
+          size="small" 
+          endIcon={<PersonAddAltIcon />}
+        >
+          Register
+        </Button>
+      </Stack>
+    </Stack>
+  );
+}
+
+
+
+====================================================================================================
+FILE: components/auth/ProtectedRoute.tsx
+====================================================================================================
+
+"use client";
+
+import { ReactNode, useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+import { useAuth } from "@/context/AuthContext";
+import Loading from "../ui/Loading";
+
+interface ProtectedRouteProps {
+  children: ReactNode;
+}
+
+export default function ProtectedRoute({
+  children,
+}: ProtectedRouteProps) {
+  const router = useRouter();
+
+  const {
+    isAuthenticated,
+    isLoading,
+  } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading) {
+    return <Loading title="please wait"/>;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+
+====================================================================================================
+FILE: components/auth/PublicRoute.tsx
+====================================================================================================
+
+"use client";
+
+import { ReactNode, useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+import { useAuth } from "@/context/AuthContext";
+import Loading from "../ui/Loading";
+
+interface PublicRouteProps {
+  children: ReactNode;
+}
+
+export default function PublicRoute({
+  children,
+}: PublicRouteProps) {
+  const router = useRouter();
+
+  const {
+    isAuthenticated,
+    isLoading,
+  } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace("/profile");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading) {
+    return <Loading title="please wait"/>;
+  }
+
+  if (isAuthenticated) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+
+====================================================================================================
+FILE: components/chat/ChatHistory.tsx
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: components/chat/ChatInput.tsx
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: components/chat/ChatMessage.tsx
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: components/forms/LoginForm.tsx
+====================================================================================================
+
+"use client";
+
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import toast from "react-hot-toast";
+
+// Material UI Components
+import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Divider from "@mui/material/Divider";
+import CircularProgress from "@mui/material/CircularProgress";
+import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
+import LoginIcon from '@mui/icons-material/Login';
+
+// Custom Project Imports
+import { LoginFormData, loginSchema } from "@/schemas/auth.schema";
+import GoogleButton from "../ui/GoogleButton";
+import FormTextField from "../ui/FormTextField";
+import PasswordField from "../ui/PasswordField";
+
+import { useAuth } from "@/context/AuthContext";
+
+export default function LoginForm() {
+
+    const { login, googleLogin } = useAuth();
+
+    const {
+      register,
+      handleSubmit,
+      reset,
+      formState: { errors, isSubmitting },
+    } = useForm<LoginFormData>({
+      resolver: zodResolver(loginSchema),
+    });
+
+    const onSubmit = async (data: LoginFormData) => {
+        const toastId = toast.loading("logging in...");
+        try {
+            await login(
+                data.email,
+                data.password
+            );
+            toast.success("logged in");
+            reset();
+        } catch {
+            toast.error("Something went wrong");
+        } finally {
+            toast.dismiss(toastId); 
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        const toastId = toast.loading("Signing in with Google...");
+
+        try {
+            await googleLogin();
+
+            toast.success("Logged in successfully");
+        } catch {
+            toast.error("Google sign in failed");
+        } finally {
+            toast.dismiss(toastId);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit(onSubmit)}>
+            <GoogleButton onClick={handleGoogleSignIn} />
+            
+            <Divider sx={{ py: 3 }}>
+                OR
+            </Divider>
+
+            <Stack spacing={2}>
+
+                <FormTextField
+                    label="Email"
+                    type="email"
+                    registerProps={register("email")}
+                    error={!!errors.email}
+                    helperText={errors.email?.message}
+                />
+
+                <PasswordField
+                    label="Password"
+                    registerProps={register("password")}
+                    error={!!errors.password}
+                    helperText={errors.password?.message}
+                />
+
+                <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={isSubmitting}
+                    fullWidth
+                    sx={{
+                        py: 1.5,
+                        mt: 1,
+                    }}
+                    startIcon={<LoginIcon/>}
+                >
+                    {isSubmitting ? (
+                        <Stack
+                            direction="row"
+                            spacing={2}
+                            sx={{
+                                justifyContent: "center",
+                                alignItems: "center"
+                            }}
+                        >
+                            <CircularProgress
+                                size={20}
+                                color="inherit"
+                            />
+                            <Typography sx={{ fontWeight: 500 }}>
+                                logging in...
+                            </Typography>
+                        </Stack>
+                    ) : (
+                        "Login"
+                    )}
+                </Button>
+            </Stack>
+            <Typography
+                variant="body2"
+                align="center"
+                sx={{ mt: 2 }}
+            >
+                Don't have an account?{"  "}
+            <Button
+                variant="outlined"
+                href="/register"
+                size="small"
+                fullWidth
+                endIcon={<PersonAddAltIcon/>}
+            >Register</Button>
+            </Typography>
+        </form>
+    );
+}
+
+
+
+====================================================================================================
+FILE: components/forms/RegisterForm.tsx
+====================================================================================================
+
+"use client";
+
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import toast from "react-hot-toast";
+
+// Material UI Components
+import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Divider from "@mui/material/Divider";
+import CircularProgress from "@mui/material/CircularProgress";
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import LoginIcon from '@mui/icons-material/Login';
+
+// Custom Project Imports
+import { registerSchema, RegisterFormData } from "@/schemas/auth.schema";
+import GoogleButton from "../ui/GoogleButton";
+import FormTextField from "../ui/FormTextField";
+import PasswordField from "../ui/PasswordField";
+
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
+
+export default function RegisterForm() {
+
+    const router = useRouter()
+
+    const {register: registerUser, googleLogin} = useAuth()
+
+    const {
+      register,
+      handleSubmit,
+      reset,
+      formState: { errors, isSubmitting },
+    } = useForm<RegisterFormData>({
+      resolver: zodResolver(registerSchema),
+    });
+
+    const onSubmit = async (data: RegisterFormData) => {
+        const toastId = toast.loading("Creating your account...");
+        try {
+            const message = await registerUser(
+                data.full_name,
+                data.email,
+                data.password
+            );
+
+            toast.success(message);
+            router.push("/check-email");
+            reset();
+        } catch {
+            toast.error("Something went wrong");
+        } finally {
+            toast.dismiss(toastId); 
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        const toastId = toast.loading("Signing in with Google...");
+
+        try {
+            await googleLogin();
+
+            toast.success("Account created successfully");
+        } catch {
+            toast.error("Google sign in failed");
+        } finally {
+            toast.dismiss(toastId);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit(onSubmit)}>
+            <GoogleButton onClick={handleGoogleSignIn} />
+            
+            <Divider sx={{ py: 3 }}>
+                OR
+            </Divider>
+
+            <Stack spacing={2}>
+                <FormTextField
+                    label="Full Name"
+                    registerProps={register("full_name")}
+                    error={!!errors.full_name}
+                    helperText={errors.full_name?.message}
+                />
+
+                <FormTextField
+                    label="Email"
+                    type="email"
+                    registerProps={register("email")}
+                    error={!!errors.email}
+                    helperText={errors.email?.message}
+                />
+
+                <PasswordField
+                    label="Password"
+                    registerProps={register("password")}
+                    error={!!errors.password}
+                    helperText={errors.password?.message}
+                />
+
+                <PasswordField
+                    label="Confirm Password"
+                    registerProps={register("confirmPassword")}
+                    error={!!errors.confirmPassword}
+                    helperText={errors.confirmPassword?.message}
+                />
+
+                <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={isSubmitting}
+                    fullWidth
+                    startIcon={<PersonAddIcon/>}
+                    sx={{
+                        py: 1.5,
+                        mt: 1,
+                    }}
+                >
+                    {isSubmitting ? (
+                        <Stack
+                            direction="row"
+                            spacing={2}
+                            sx={{
+                                justifyContent: "center",
+                                alignItems: "center"
+                            }}
+                        >
+                            <CircularProgress
+                                size={20}
+                                color="inherit"
+                            />
+                            <Typography sx={{ fontWeight: 500 }}>
+                                Creating Account...
+                            </Typography>
+                        </Stack>
+                    ) : (
+                        "Register"
+                    )}
+                </Button>
+                <Typography
+                    variant="body2"
+                    align="center"
+                    sx={{ mt: 2 }}
+                >
+                    Already have an account?{"  "}
+                <Button
+                    variant="outlined"
+                    href="/login"
+                    size="small"
+                    fullWidth
+                    endIcon={<LoginIcon/>}
+                >Login</Button>
+                </Typography>
+            </Stack>
+        </form>
+    );
+}
+
+
+
+====================================================================================================
+FILE: components/layout/DashboardLayout.tsx
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: components/layout/Navbar.tsx
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: components/layout/Sidebar.tsx
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: components/ui/AuthCard.tsx
+====================================================================================================
+
+import { ReactNode } from "react";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Container from "@mui/material/Container";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+
+import Logo from "./Logo";
+
+interface AuthCardProps {
+  title: string;
+  subtitle: string;
+  children: ReactNode;
+}
+
+export default function AuthCard({
+  title,
+  subtitle,
+  children,
+}: AuthCardProps) {
+  return (
+    <Container maxWidth="sm">
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Card
+          elevation={4}
+          sx={{
+            width: "100%",
+            borderRadius: 4,
+          }}
+        >
+          <CardContent sx={{ p: 4 }}>
+            <Stack
+              spacing={3}
+            >
+              <Stack
+                spacing={1}
+                sx={{
+                  alignItems: "center",
+                  textAlign: "center",
+                }}
+              >
+                <Logo />
+
+                <Typography
+                  variant="h4"
+                  sx={{ fontWeight: 700 }}
+                >
+                  {title}
+                </Typography>
+
+                <Typography
+                  variant="body1"
+                  color="text.secondary"
+                >
+                  {subtitle}
+                </Typography>
+              </Stack>
+
+              {children}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
+    </Container>
+  );
+}
+
+
+====================================================================================================
+FILE: components/ui/FormTextField.tsx
+====================================================================================================
+
+"use client";
+
+import TextField, { TextFieldProps } from "@mui/material/TextField";
+import { UseFormRegisterReturn } from "react-hook-form";
+
+interface FormTextFieldProps {
+  label: string;
+  type?: string;
+  error?: boolean;
+  helperText?: string;
+  registerProps: UseFormRegisterReturn; // Strictly types the React Hook Form bindings
+  slotProps?: TextFieldProps["slotProps"]; // Allows passing custom inputs like your visibility toggle buttons
+}
+
+export default function FormTextField({
+  label,
+  type = "text",
+  error = false,
+  helperText = "",
+  registerProps,
+  slotProps,
+}: FormTextFieldProps) {
+  return (
+    <TextField
+      {...registerProps} // Injects onChange, onBlur, name, and ref
+      label={label}
+      type={type}
+      fullWidth
+      error={error}
+      helperText={helperText}
+      slotProps={slotProps} // Handles endAdornments cleanly if provided
+    />
+  );
+}
+
+
+
+====================================================================================================
+FILE: components/ui/GoogleButton.tsx
+====================================================================================================
+
+import Button from "@mui/material/Button";
+import GoogleIcon from "@mui/icons-material/Google";
+
+interface GoogleButtonProps {
+  onClick: () => void;
+}
+
+export default function GoogleButton({
+  onClick,
+}: GoogleButtonProps) {
+  return (
+    <Button
+      fullWidth
+      variant="outlined"
+      startIcon={<GoogleIcon />}
+      onClick={onClick}
+      sx={{
+        py: 1.5,
+        borderRadius: 3,
+      }}
+    >
+      Continue with Google
+    </Button>
+  );
+}
+
+
+====================================================================================================
+FILE: components/ui/Loading.tsx
+====================================================================================================
+
+"use client";
+
+import Box from "@mui/material/Box";
+import LinearProgress from "@mui/material/LinearProgress";
+import Typography from "@mui/material/Typography";
+
+export default function Loading(
+  {title = ""}: {title?:string} 
+) {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "100vh", // Centers within parent card/container. Use '100vh' for whole screen.
+        gap: 2,
+      }}
+    >
+      <Typography 
+        variant="body1" 
+        color="text.secondary"
+        sx={{ fontWeight: 500 }}
+      >
+        Loading {title}...
+      </Typography>
+      <LinearProgress 
+      color="primary" 
+      aria-label="Loading…"
+      sx={{
+        width:"50vw"
+      }}
+      />
+    </Box>
+  );
+}
+
+
+
+====================================================================================================
+FILE: components/ui/Logo.tsx
+====================================================================================================
+
+import Image from "next/image";
+import Typography from "@mui/material/Typography";
+import Stack from '@mui/material/Stack';
+
+interface LogoProps {
+  size?: number;
+  showText?: boolean;
+  textColor?: "primary" | "secondary" | "inherit";
+}
+
+export default function Logo({
+  size = 48,
+  showText = true,
+  textColor="primary",
+}: LogoProps) {
+  return (
+    <Stack
+      direction="row"
+      spacing={2}
+      sx={{alignItems:"center"}}
+    >
+      <Image
+        src="/logo.png"
+        alt="HealthCopilot Logo"
+        width={size}
+        height={size}
+      />
+
+      {showText && (
+        <Typography
+          variant="h5"
+          color={textColor}
+          sx={{fontWeight: 700}}
+        >
+          Health Copilot
+        </Typography>
+      )}
+    </Stack>
+  );
+}
+
+
+====================================================================================================
+FILE: components/ui/PasswordField.tsx
+====================================================================================================
+
+"use client";
+
+import IconButton from "@mui/material/IconButton";
+import InputAdornment from "@mui/material/InputAdornment";
+import TextField from "@mui/material/TextField";
+import { UseFormRegisterReturn } from "react-hook-form";
+
+// Material UI Icons
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import { useState } from "react";
+
+interface FormTextFieldProps {
+  label: string;
+  error?: boolean;
+  helperText?: string;
+  registerProps: UseFormRegisterReturn; // Strictly types the React Hook Form bindings
+}
+
+export default function PasswordField({
+  label,
+  error = false,
+  helperText = "",
+  registerProps,
+}: FormTextFieldProps) {
+
+    const [showPassword, setShowPassword] = useState(false);
+
+    const togglePasswordVisibility = () => {
+        setShowPassword((prev) => !prev);
+    };
+
+    return (
+        <TextField
+        {...registerProps} // Injects onChange, onBlur, name, and ref
+        label={label}
+        type={showPassword ? "text" : "password"}
+        fullWidth
+        error={error}
+        helperText={helperText}
+        slotProps={{
+                input: {
+                    endAdornment: (
+                        <InputAdornment position="end">
+                            <IconButton onClick={togglePasswordVisibility}>
+                                {showPassword ? <VisibilityOff /> : <Visibility />}
+                            </IconButton>
+                        </InputAdornment>
+                    ),
+                },
+            }
+        } 
+        />
+    );
+}
+
+
+
+====================================================================================================
+FILE: components/ui/ThemeProvider.tsx
+====================================================================================================
+
+"use client";
+
+import { ThemeProvider as MuiThemeProvider, createTheme } from "@mui/material/styles";
+import CssBaseline from "@mui/material/CssBaseline";
+import { ReactNode } from "react";
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: "#22c55e", // Health green
+    },
+    secondary: {
+      main: "#0b1630",
+    },
+    background: {
+      default: "#d0e4f5",
+    },
+  },
+
+  shape: {
+    borderRadius: 16,
+  },
+
+  typography: {
+    fontFamily: "Inter, sans-serif",
+
+    h4: {
+      fontWeight: 700,
+    },
+
+    h5: {
+      fontWeight: 600,
+    },
+
+    button: {
+      textTransform: "none",
+      fontWeight: 600,
+    },
+  },
+});
+
+interface ThemeProps {
+    children : ReactNode
+}
+
+export default function ThemeProvider({
+  children,
+}: ThemeProps) {
+  return (
+    <MuiThemeProvider theme={theme}>
+      <CssBaseline />
+      {children}
+    </MuiThemeProvider>
+  );
+}
+
+
+====================================================================================================
+FILE: context/AuthContext.tsx
+====================================================================================================
+
+"use client";
+
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+  useRef
+} from "react";
+
+import { User } from "@/types/user";
+import { getCurrentUser } from "@/services/auth.service";
+import {
+  getAccessToken,
+  removeAccessToken,
+} from "@/lib/auth";
+
+import {
+  login as loginApi,
+  register as registerApi,
+  googleLogin as googleLoginApi,
+  verifyEmail as verifyEmailApi
+} from "@/services/auth.service";
+
+import { setAccessToken } from "@/lib/auth";
+
+interface AuthContextType {
+  user: User | null;
+
+  isAuthenticated: boolean;
+
+  isLoading: boolean;
+
+  login: (
+    email: string,
+    password: string
+  ) => Promise<void>;
+
+  register: (
+      full_name: string,
+      email: string,
+      password: string
+  ) => Promise<string>;
+
+  verifyEmail: (
+      token: string
+  ) => Promise<string>;
+
+  googleLogin: () => Promise<void>;
+
+  refreshUser: () => Promise<void>;
+
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(
+  undefined
+);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export function AuthProvider({
+  children,
+}: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const googlePromise = useRef<{
+    resolve?: () => void;
+    reject?: (error: unknown) => void;
+  }>({});
+
+  const googleInitialized = useRef(false);
+
+  const login = async (
+  email: string,
+  password: string
+  ) => {
+  const response = await loginApi({
+      email,
+      password,
+  });
+
+  setAccessToken(
+      response.data.token.access_token
+  );
+
+  setUser(response.data.user);
+  };
+
+  const register = async (
+      full_name: string,
+      email: string,
+      password: string
+  ): Promise<string> => {
+
+      const response = await registerApi({
+          full_name,
+          email,
+          password,
+      });
+      console.log(response)
+
+      return response.data.message;
+  };
+
+  const verifyEmail = async (
+      token: string
+  ): Promise<string> => {
+
+      const response = await verifyEmailApi(
+          token
+      );
+
+      return response.data.message;
+  };
+
+  useEffect(() => {
+    if (googleInitialized.current) return;
+
+    if (!window.google) return;
+
+    googleInitialized.current = true;
+
+    window.google.accounts.id.initialize({
+      client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+      callback: async (response: CredentialResponse) => {
+        try {
+          const authResponse = await googleLoginApi({
+            id_token: response.credential,
+          });
+
+          setAccessToken(
+            authResponse.data.token.access_token
+          );
+
+          setUser(authResponse.data.user);
+
+          googlePromise.current.resolve?.();
+        } catch (error) {
+          googlePromise.current.reject?.(error);
+        }
+      },
+    });
+  }, []);
+
+  const googleLogin = () => {
+    return new Promise<void>((resolve, reject) => {
+      if (!window.google) {
+        reject(new Error("Google SDK not loaded"));
+        return;
+      }
+
+      googlePromise.current = {
+        resolve,
+        reject,
+      };
+
+      window.google.accounts.id.prompt();
+    });
+  };
+
+    const refreshUser = async () => {
+      try {
+        const response = await getCurrentUser();
+        setUser(response.data);
+      } catch {
+        removeAccessToken();
+        setUser(null);
+      }
+    };
+
+    const logout = () => {
+      removeAccessToken();
+      setUser(null);
+    };
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      const token = getAccessToken();
+
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      await refreshUser();
+      setIsLoading(false);
+    };
+
+    initializeAuth();
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{
+          user,
+          isAuthenticated: !!user,
+          isLoading,
+
+          login,
+          register,
+          verifyEmail,
+          googleLogin,
+
+          refreshUser,
+
+          logout,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error(
+      "useAuth must be used within an AuthProvider"
+    );
+  }
+
+  return context;
+}
+
+
+====================================================================================================
+FILE: copied_files.txt
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: copy_file.py
+====================================================================================================
+
+from pathlib import Path
+
+# Root of your project
+ROOT = Path(".")
+
+# Output file
+OUTPUT_FILE = "copied_files.txt"
+
+# Directories to skip
+SKIP_DIRS = {
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "node_modules",
+    ".next",
+    "dist",
+    "build",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".idea",
+    ".vscode",
+    "package-lock.json"
+}
+
+# File extensions to include
+INCLUDE_EXTENSIONS = {
+    ".py",
+    ".tsx",
+    ".ts",
+    ".jsx",
+    ".js",
+    ".json",
+    ".css",
+    ".scss",
+    ".html",
+    ".md",
+    ".txt",
+    ".env.example",
+    ".yml",
+    ".yaml",
+    ".toml",
+    ".sql",
+    ".sh",
+    ".gitignore",
+}
+
+# Individual filenames to include
+INCLUDE_FILENAMES = {
+    "Dockerfile",
+    "docker-compose.yml",
+    "requirements.txt",
+    "package.json",
+    "README.md",
+    "vercel.json",
+    "tsconfig.json",
+    "next.config.ts",
+    "next.config.js",
+    ".env.example",
+}
+
+
+def should_include(path: Path) -> bool:
+    if any(part in SKIP_DIRS for part in path.parts):
+        return False
+
+    if path.name in INCLUDE_FILENAMES:
+        return True
+
+    if path.suffix in INCLUDE_EXTENSIONS:
+        return True
+
+    return False
+
+
+with open(OUTPUT_FILE, "w", encoding="utf-8") as out:
+
+    for file in sorted(ROOT.rglob("*")):
+
+        if not file.is_file():
+            continue
+
+        if not should_include(file):
+            continue
+
+        relative = file.relative_to(ROOT)
+
+        out.write("=" * 100 + "\n")
+        out.write(f"FILE: {relative}\n")
+        out.write("=" * 100 + "\n\n")
+
+        try:
+            content = file.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            out.write("[Binary file skipped]\n\n")
+            continue
+        except Exception as e:
+            out.write(f"[Could not read file: {e}]\n\n")
+            continue
+
+        out.write(content)
+        out.write("\n\n\n")
+
+print(f"Done! Output written to {OUTPUT_FILE}")
+
+
+====================================================================================================
+FILE: lib/api.ts
+====================================================================================================
+
+import axios from "axios";
+
+import { getAccessToken } from "./auth";
+
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+api.interceptors.request.use(
+  (config) => {
+    const token = getAccessToken();
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+export default api;
+
+
+====================================================================================================
+FILE: lib/auth.ts
+====================================================================================================
+
+const ACCESS_TOKEN_KEY = "access_token";
+
+export function getAccessToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+export function setAccessToken(token: string): void {
+  localStorage.setItem(ACCESS_TOKEN_KEY, token);
+}
+
+export function removeAccessToken(): void {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+}
+
+
+====================================================================================================
+FILE: lib/utils.ts
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: next-env.d.ts
+====================================================================================================
+
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+import "./.next/dev/types/routes.d.ts";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+
+
+====================================================================================================
+FILE: next.config.ts
+====================================================================================================
+
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  allowedDevOrigins: [
+    "10.166.237.222",
+    "therapist-becoming-stage-hear.trycloudflare.com",
+    "lh3.googleusercontent.com",
+    "https://health-copilot-029n.onrender.com",
+    "https://health-copilot-rouge.vercel.app"
+  ],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+        pathname: "/**",
+      },
+    ],
+  },
+};
+
+export default nextConfig;
+
+
+====================================================================================================
+FILE: package.json
+====================================================================================================
+
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@emotion/cache": "^11.14.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@hookform/resolvers": "^5.4.0",
+    "@mui/icons-material": "^9.2.0",
+    "@mui/material": "^9.2.0",
+    "@mui/material-nextjs": "^9.1.1",
+    "@tanstack/react-query": "^5.101.4",
+    "axios": "^1.18.1",
+    "jwt-decode": "^4.0.0",
+    "next": "16.2.11",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-hook-form": "^7.82.0",
+    "react-hot-toast": "^2.6.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^10.7.0",
+    "eslint-config-next": "16.2.11",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.2"
+  },
+  "ignoreScripts": [
+    "sharp",
+    "unrs-resolver"
+  ],
+  "trustedDependencies": [
+    "sharp",
+    "unrs-resolver"
+  ],
+  "overrides": {
+    "next": "16.2.11",
+    "postcss": "^8.5.10",
+    "sharp": "^0.35.0"
+  }
+}
+
+
+
+====================================================================================================
+FILE: schemas/auth.schema.ts
+====================================================================================================
+
+import { z } from "zod";
+
+export const registerSchema = z
+  .object({
+    full_name: z
+      .string()
+      .min(2, "Name must be at least 2 characters"),
+
+    email: z
+      .email("Invalid email address"),
+
+    password: z
+      .string()
+      .min(8, "Password must contain at least 8 characters"),
+
+    confirmPassword: z.string(),
+  })
+  .refine(
+    (data) => data.password === data.confirmPassword,
+    {
+      path: ["confirmPassword"],
+      message: "Passwords do not match",
+    }
+  );
+
+export type RegisterFormData = z.infer<typeof registerSchema>;
+
+
+export const loginSchema = z.object({
+    email: z
+        .email("Please enter a valid email"),
+
+    password: z
+        .string()
+        .min(1, "Password is required"),
+});
+
+export type LoginFormData = z.infer<typeof loginSchema>;
+
+
+====================================================================================================
+FILE: services/auth.service.ts
+====================================================================================================
+
+import api from "@/lib/api";
+import {
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  MessageResponse
+} from "@/types/auth";
+import { User } from "@/types/user";
+import { GoogleLoginRequest } from "@/types/auth";
+
+export const login = (data: LoginRequest) =>
+  api.post<AuthResponse>("/auth/login", data);
+
+export const register = (data: RegisterRequest) =>
+  api.post<MessageResponse>("/auth/register", data);
+
+export const getCurrentUser = () =>
+  api.get<User>("/auth/me");
+
+export const googleLogin = (
+  data: GoogleLoginRequest
+) => api.post<AuthResponse>("/auth/google", data);
+
+export const verifyEmail = (
+    token: string
+) => {
+    return api.post("/auth/verify-email", {
+        token,
+    });
+};
+
+
+====================================================================================================
+FILE: services/chat.service.ts
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: services/nutrition.service.ts
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: services/profile.service.ts
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: services/weight.service.ts
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: services/workout.service.ts
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: tsconfig.json
+====================================================================================================
+
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}
+
+
+
+====================================================================================================
+FILE: types/auth.ts
+====================================================================================================
+
+import { User } from "./user";
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  full_name: string;
+  email: string;
+  password: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  token: TokenResponse;
+}
+
+export interface MessageResponse {
+  message : string
+}
+
+export interface GoogleLoginRequest {
+  id_token: string;
+}
+
+
+====================================================================================================
+FILE: types/chat.ts
+====================================================================================================
+
+
+
+
+====================================================================================================
+FILE: types/google.d.ts
+====================================================================================================
+
+export {};
+
+declare global {
+  interface Window {
+    google: {
+      accounts: {
+        id: {
+          initialize(config: {
+            client_id: string;
+            callback: (response: CredentialResponse) => void;
+          }): void;
+
+          renderButton(
+            parent: HTMLElement,
+            options: Record<string, unknown>
+          ): void;
+
+          prompt(): void;
+        };
+      };
+    };
+  }
+
+  interface CredentialResponse {
+    credential: string;
+    select_by: string;
+  }
+}
+
+
+====================================================================================================
+FILE: types/user.ts
+====================================================================================================
+
+export interface User {
+  id: string;
+  full_name: string;
+  email: string;
+  profile_picture: string | null;
+  created_at: string;
+}
+
+

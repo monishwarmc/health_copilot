@@ -9,7 +9,7 @@ Welcome to <b>Health Copilot</b>.
 </p>
 
 <p>
-Please verify your email address by clicking the button below.
+Please reset your password by clicking the button below.
 </p>
 
 <p>
@@ -21,22 +21,65 @@ Please verify your email address by clicking the button below.
         background:#1976d2;
         color:white;
         padding:12px 20px;
-        border-radius:5px;
+        border-radius:9px;
         text-decoration:none;
     "
 >
     Verify Email
 </a>
 </p>
-<p>
-if you disabled links in emails, Please copy the given URL👇 and open it in your browser
-</p>
 
 <p>
-{{ verification_url }}
+If you disabled links in emails, please copy the given URL and open it in browser:
 </p>
-<p>
+
+<!-- Container for the URL and Copy Button -->
+<div style="background: #f5f5f5; padding: 12px; border-radius: 6px; display: inline-block; word-break: break-all;">
+    <span id="urlToCopy" style="font-family: monospace; font-size: 14px; margin-right: 10px;">{{ verification_url }}</span>
+    <button 
+        id="copyBtn"
+        onclick="copyLink()" 
+        style="
+            background: #4caf50; 
+            color: white; 
+            border: none; 
+            padding: 6px 12px; 
+            border-radius: 4px; 
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+        "
+    >
+        Copy Link
+    </button>
+</div>
+
+<p style="margin-top: 20px;">
 If you didn't create this account, you can safely ignore this email.
 </p>
+
+<!-- JavaScript for Clipboard functionality -->
+<script>
+function copyLink() {
+    var urlText = document.getElementById("urlToCopy").innerText;
+    var btn = document.getElementById("copyBtn");
+    
+    navigator.clipboard.writeText(urlText)
+        .then(() => {
+            // Visual feedback for the user
+            btn.innerText = "Copied!";
+            btn.style.background = "#2e7d32";
+            
+            // Reset button text after 2 seconds
+            setTimeout(() => {
+                btn.innerText = "Copy Link";
+                btn.style.background = "#4caf50";
+            }, 2000);
+        })
+        .catch(err => {
+            console.error("Could not copy text: ", err);
+        });
+}
+</script>
 
 {% endblock %}

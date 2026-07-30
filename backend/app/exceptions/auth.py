@@ -7,7 +7,7 @@ class EmailAlreadyExistsException(AppException):
     def __init__(self):
         super().__init__(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email is already registered"             
+            detail="Email already registered, please login"             
         )
         
         
@@ -60,4 +60,11 @@ class EmailNotVerifiedException(AppException):
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Please verify your email"       
+        )
+        
+class EmailNotExists(AppException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Email does not exist in the database, please register"
         )

@@ -12,7 +12,9 @@ from app.schemas.auth import (
     AuthResponse,
     UserLoginRequest,
     MessageResponse,
-    VerifyEmailRequest
+    VerifyEmailRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest
 )
 from app.schemas.user import UserResponse
 from app.exceptions.auth import (
@@ -20,7 +22,8 @@ from app.exceptions.auth import (
     InvalidCredentialsException,
     InvalidGoogleEmailException,
     GoogleAccountException,
-    EmailNotVerifiedException
+    EmailNotVerifiedException,
+    EmailNotExists
 )
 from app.core.security import verify_password, create_email_verification_token
 
@@ -273,5 +276,35 @@ class AuthService:
         return MessageResponse(
             message="Email verified successfully."
         )
+        
+        
+    def forgot_password(
+        self,
+        db: Session,
+        request: ForgotPasswordRequest
+    )-> MessageResponse:
+        
+        email = request.email
+        user = user_repository.get_by_email(
+            db=db,
+            email=email
+        )
+        if user is None:
+            raise EmailNotExists()
+        token = create_email_verification_token(
+            email=user.email
+        )
+        verification_url = (
+            f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        )
+        
+        
+    
+    def reset_password(
+        self,
+        db: Session,
+        request: ResetPasswordRequest
+    ):
+        ...
         
 auth_service = AuthService()

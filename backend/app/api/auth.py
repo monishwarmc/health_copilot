@@ -9,7 +9,9 @@ from app.schemas.auth import (
     UserRegisterRequest,
     GoogleLoginRequest,
     MessageResponse,
-    VerifyEmailRequest
+    VerifyEmailRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest
 )
 from app.services.auth_service import auth_service
 
@@ -24,7 +26,7 @@ router = APIRouter(
 )
 
 
-
+#Register
 @router.post(
     "/register",
     response_model=MessageResponse,
@@ -41,7 +43,8 @@ def register(
         request=request,
     )
     
-    
+
+#Login 
 @router.post(
     "/login",
     response_model=AuthResponse,
@@ -57,6 +60,7 @@ def login(
     )
     
 
+#get_me
 @router.get(
     "/me",
     response_model=UserResponse,
@@ -68,7 +72,9 @@ def get_me(
     return UserResponse.model_validate(
         current_user
     )
-    
+
+
+#Google auth
 @router.post(
     "/google",
     response_model=AuthResponse,
@@ -83,6 +89,8 @@ def google_login(
         db=db
     )
     
+
+#Verify email
 @router.post(
     "/verify-email",
     response_model=MessageResponse,
@@ -95,3 +103,27 @@ def verify_email(
         db=db,
         request=request,
     )
+    
+
+#Forgot password
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse
+)
+def forgot_password(
+    request: ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    ...
+    
+    
+#Reset password
+@router.post(
+    "/reset-password",
+    response_model=MessageResponse
+)
+def reset_password(
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    ...

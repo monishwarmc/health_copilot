@@ -21,6 +21,7 @@ import PasswordField from "../ui/PasswordField";
 
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import getErrorMessage from "@/lib/error"
 
 export default function RegisterForm() {
 
@@ -49,8 +50,12 @@ export default function RegisterForm() {
             toast.success(message);
             router.push("/check-email");
             reset();
-        } catch {
-            toast.error("Something went wrong");
+        } catch (error) {
+            const err = getErrorMessage(error)
+            if (err == "Email already registered, please login") {
+                router.replace("/login")
+            }
+            toast.error(err)
         } finally {
             toast.dismiss(toastId); 
         }

@@ -96,14 +96,11 @@ export function AuthProvider({
       email: string,
       password: string
   ): Promise<string> => {
-
       const response = await registerApi({
-          full_name,
-          email,
-          password,
+        full_name,
+        email,
+        password,
       });
-      console.log(response)
-
       return response.data.message;
   };
 
