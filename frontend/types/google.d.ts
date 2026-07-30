@@ -1,6 +1,22 @@
 export {};
 
+interface PromptMomentNotification {
+  isNotDisplayed(): boolean;
+  getNotDisplayedReason(): string | undefined;
+
+  isSkippedMoment(): boolean;
+  getSkippedReason(): string | undefined;
+
+  isDismissedMoment(): boolean;
+  getDismissedReason(): string | undefined;
+}
+
 declare global {
+  interface CredentialResponse {
+    credential: string;
+    select_by: string;
+  }
+
   interface Window {
     google: {
       accounts: {
@@ -15,14 +31,13 @@ declare global {
             options: Record<string, unknown>
           ): void;
 
-          prompt(): void;
+          prompt(
+            callback?: (
+              notification: PromptMomentNotification
+            ) => void
+          ): void;
         };
       };
     };
-  }
-
-  interface CredentialResponse {
-    credential: string;
-    select_by: string;
   }
 }

@@ -32,7 +32,14 @@ export default function RootLayout({
                   {children}
               <Toaster
                 position="top-right"
-                reverseOrder={false}
+                toastOptions={{
+                  success: {
+                    duration: 3000,
+                  },
+                  error: {
+                    duration: 7000,
+                  },
+                }}
               />
               </AuthProvider>
             </ThemeProvider>

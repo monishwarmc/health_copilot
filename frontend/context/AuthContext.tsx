@@ -145,21 +145,79 @@ export function AuthProvider({
   }, []);
 
   const googleLogin = () => {
-    return new Promise<void>((resolve, reject) => {
-      if (!window.google) {
-        reject(new Error("Google SDK not loaded"));
+  return new Promise<void>((resolve, reject) => {
+    if (!window.google) {
+      reject(new Error("Google SDK not loaded"));
+      return;
+    }
+
+    let settled = false;
+
+    const finish = (error?: Error) => {
+      if (settled) return;
+
+      settled = true;
+      clearTimeout(timeout);
+      googlePromise.current = {};
+
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    };
+
+    const timeout = setTimeout(() => {
+      finish(
+        new Error(
+          "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
+        )
+      );
+    }, 10000);
+
+    googlePromise.current = {
+      resolve: () => finish(),
+
+      reject: (error) =>
+        finish(
+          error instanceof Error
+            ? error
+            : new Error("Google Sign-In failed.")
+        ),
+    };
+
+    window.google.accounts.id.prompt((notification) => {
+      if (notification.isNotDisplayed()) {
+        console.log(
+          "Google Not Displayed:",
+          notification.getNotDisplayedReason()
+        );
+
+        finish(
+          new Error(
+            "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
+          )
+        );
         return;
       }
 
-      googlePromise.current = {
-        resolve,
-        reject,
-      };
+      if (notification.isSkippedMoment()) {
+        console.log(
+          "Google Skipped:",
+          notification.getSkippedReason()
+        );
 
-      window.google.accounts.id.prompt();
+        finish(
+          new Error(
+            "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
+          )
+        );
+        return;
+      }
+
     });
-  };
-
+  });
+};
     const refreshUser = async () => {
       try {
         const response = await getCurrentUser();

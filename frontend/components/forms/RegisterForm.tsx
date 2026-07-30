@@ -51,9 +51,14 @@ export default function RegisterForm() {
             router.push("/check-email");
             reset();
         } catch (error) {
-            const err = getErrorMessage(error)
+            let err = getErrorMessage(error)
             if (err == "Email already registered, please login") {
-                router.replace("/login")
+                router.replace(
+                `/login?email=${encodeURIComponent(
+                    data.email
+                )}&registered=true`
+                );
+                return;
             }
             toast.error(err)
         } finally {
@@ -68,8 +73,9 @@ export default function RegisterForm() {
             await googleLogin();
 
             toast.success("Account created successfully");
-        } catch {
-            toast.error("Google sign in failed");
+        } catch(e) {
+            let err = getErrorMessage(e)
+            toast.error(err);
         } finally {
             toast.dismiss(toastId);
         }
