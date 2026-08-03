@@ -27,7 +27,7 @@ export default function RegisterForm() {
 
     const router = useRouter()
 
-    const {register: registerUser, googleLogin} = useAuth()
+    const {register: registerUser, googleAuth} = useAuth()
 
     const {
       register,
@@ -48,7 +48,7 @@ export default function RegisterForm() {
             );
 
             toast.success(message);
-            router.push("/check-email");
+            router.push(`/check-email?message=${encodeURIComponent(message)}`);
             reset();
         } catch (error) {
             let err = getErrorMessage(error)
@@ -70,9 +70,8 @@ export default function RegisterForm() {
         const toastId = toast.loading("Signing in with Google...");
 
         try {
-            await googleLogin();
-
-            toast.success("Account created successfully");
+            await googleAuth()
+            toast.success("successfully signed in with google");
         } catch(e) {
             let err = getErrorMessage(e)
             toast.error(err);

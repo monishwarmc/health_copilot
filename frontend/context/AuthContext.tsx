@@ -19,8 +19,11 @@ import {
 import {
   login as loginApi,
   register as registerApi,
-  googleLogin as googleLoginApi,
-  verifyEmail as verifyEmailApi
+  verifyEmail as verifyEmailApi,
+  profile as profileApi,
+  password as passwordApi,
+  account as deleteApi,
+  googleLogin as googleLoginApi
 } from "@/services/auth.service";
 
 import { setAccessToken } from "@/lib/auth";
@@ -43,11 +46,27 @@ interface AuthContextType {
       password: string
   ) => Promise<string>;
 
+  account: (
+    password: string | null,
+    google_token: string | null
+  ) => Promise<string>;
+
+  profile: (
+    full_name: string | null,
+    profile_picture: string | null
+  ) => Promise<User>;
+
+  password: (
+    old_password: string,
+    new_password: string
+  ) => Promise<string>;
+
   verifyEmail: (
       token: string
   ) => Promise<string>;
 
-  googleLogin: () => Promise<void>;
+  googleAuth: () => Promise<void>;
+  googleVerify: () => Promise<string>;
 
   refreshUser: () => Promise<void>;
 
@@ -69,7 +88,7 @@ export function AuthProvider({
   const [isLoading, setIsLoading] = useState(true);
 
   const googlePromise = useRef<{
-    resolve?: () => void;
+    resolve?: (idToken: string) => void;
     reject?: (error: unknown) => void;
   }>({});
 
@@ -115,6 +134,42 @@ export function AuthProvider({
       return response.data.message;
   };
 
+  const profile = async(
+    full_name: string | null,
+    profile_picture: string | null
+  ): Promise<User> => {
+    const response = await profileApi(
+      full_name,
+      profile_picture
+    )
+    setUser(response.data);
+    return response.data;
+  }
+
+  const password = async(
+    old_password: string,
+    new_password: string
+  ): Promise<string> => {
+    const response = await passwordApi(
+      old_password,
+      new_password
+    )
+    return response.data.message;
+  }
+
+  const account = async(
+    password: string | null,
+    google_token: string | null
+  ): Promise<string> => {
+    const reponse = await deleteApi(
+      password,
+      google_token
+    )
+    removeAccessToken();
+    setUser(null);
+    return reponse.data.message;
+  }
+
   useEffect(() => {
     if (googleInitialized.current) return;
 
@@ -124,100 +179,106 @@ export function AuthProvider({
 
     window.google.accounts.id.initialize({
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
-      callback: async (response: CredentialResponse) => {
-        try {
-          const authResponse = await googleLoginApi({
-            id_token: response.credential,
-          });
-
-          setAccessToken(
-            authResponse.data.token.access_token
-          );
-
-          setUser(authResponse.data.user);
-
-          googlePromise.current.resolve?.();
-        } catch (error) {
-          googlePromise.current.reject?.(error);
-        }
+      callback: (response: CredentialResponse) => {
+        googlePromise.current.resolve?.(
+          response.credential
+        );
       },
     });
   }, []);
 
-  const googleLogin = () => {
-  return new Promise<void>((resolve, reject) => {
-    if (!window.google) {
-      reject(new Error("Google SDK not loaded"));
-      return;
+  const googleVerify = () => {
+      return new Promise<string>((resolve, reject) => {
+        if (!window.google) {
+          reject(new Error("Google SDK not loaded"));
+          return;
+        }
+
+        let settled = false;
+
+        const finish = (error: Error) => {
+          if (settled) return;
+
+          settled = true;
+          clearTimeout(timeout);
+          googlePromise.current = {};
+
+          reject(error);
+        };
+
+        const timeout = setTimeout(() => {
+          finish(
+            new Error(
+              "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
+            )
+          );
+        }, 10000);
+
+        googlePromise.current = {
+          resolve: (idToken) => {
+            if (settled) return;
+
+            settled = true;
+            clearTimeout(timeout);
+            googlePromise.current = {};
+
+            resolve(idToken);
+          },
+
+          reject: (error) =>
+            finish(
+              error instanceof Error
+                ? error
+                : new Error("Google Sign-In failed.")
+            ),
+        };
+
+        window.google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed()) {
+            console.log(
+              "Google Not Displayed:",
+              notification.getNotDisplayedReason()
+            );
+
+            finish(
+              new Error(
+                "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
+              )
+            );
+            return;
+          }
+
+          if (notification.isSkippedMoment()) {
+            console.log(
+              "Google Skipped:",
+              notification.getSkippedReason()
+            );
+
+            finish(
+              new Error(
+                "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
+              )
+            );
+            return;
+          }
+
+        });
+      });
+    };
+
+    const googleAuth = async()=>{
+      const id_token = await googleVerify()
+      const response = await googleLoginApi({
+          id_token,
+      });
+
+      setAccessToken(
+          response.data.token.access_token
+      );
+
+      setUser(response.data.user);
     }
 
-    let settled = false;
-
-    const finish = (error?: Error) => {
-      if (settled) return;
-
-      settled = true;
-      clearTimeout(timeout);
-      googlePromise.current = {};
-
-      if (error) {
-        reject(error);
-      } else {
-        resolve();
-      }
-    };
-
-    const timeout = setTimeout(() => {
-      finish(
-        new Error(
-          "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
-        )
-      );
-    }, 10000);
-
-    googlePromise.current = {
-      resolve: () => finish(),
-
-      reject: (error) =>
-        finish(
-          error instanceof Error
-            ? error
-            : new Error("Google Sign-In failed.")
-        ),
-    };
-
-    window.google.accounts.id.prompt((notification) => {
-      if (notification.isNotDisplayed()) {
-        console.log(
-          "Google Not Displayed:",
-          notification.getNotDisplayedReason()
-        );
-
-        finish(
-          new Error(
-            "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
-          )
-        );
-        return;
-      }
-
-      if (notification.isSkippedMoment()) {
-        console.log(
-          "Google Skipped:",
-          notification.getSkippedReason()
-        );
-
-        finish(
-          new Error(
-            "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
-          )
-        );
-        return;
-      }
-
-    });
-  });
-};
     const refreshUser = async () => {
       try {
         const response = await getCurrentUser();
@@ -259,7 +320,11 @@ export function AuthProvider({
           login,
           register,
           verifyEmail,
-          googleLogin,
+          googleVerify,
+          googleAuth,
+          profile,
+          password,
+          account,
 
           refreshUser,
 

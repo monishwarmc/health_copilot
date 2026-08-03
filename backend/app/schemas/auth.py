@@ -48,8 +48,38 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr
     
 class ResetPasswordRequest(BaseModel):
-    token: TokenResponse
+    token: str
     new_password: str = Field(
         min_length=8,
         max_length=128
     )
+    
+    
+class ProfileUpdateRequest(BaseModel):
+    full_name: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=100
+    )
+    profile_picture: str | None
+    
+
+class PasswordChangeRequest(BaseModel):
+    old_password: str = Field(
+        min_length=8,
+        max_length=128
+    )
+    new_password: str = Field(
+        min_length=8,
+        max_length=128
+    )
+    
+    
+class AccountDeleteRequest(BaseModel):
+    password: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=128
+    )
+    google_token : str | None
+        

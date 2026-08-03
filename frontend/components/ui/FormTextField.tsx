@@ -1,6 +1,7 @@
 "use client";
 
 import TextField, { TextFieldProps } from "@mui/material/TextField";
+import { Ref } from "react";
 import { UseFormRegisterReturn } from "react-hook-form";
 
 interface FormTextFieldProps {
@@ -10,6 +11,7 @@ interface FormTextFieldProps {
   helperText?: string;
   registerProps: UseFormRegisterReturn; // Strictly types the React Hook Form bindings
   slotProps?: TextFieldProps["slotProps"]; // Allows passing custom inputs like your visibility toggle buttons
+  ref?: Ref<HTMLInputElement>
 }
 
 export default function FormTextField({
@@ -19,6 +21,7 @@ export default function FormTextField({
   helperText = "",
   registerProps,
   slotProps,
+  ref
 }: FormTextFieldProps) {
   return (
     <TextField
@@ -29,6 +32,7 @@ export default function FormTextField({
       error={error}
       helperText={helperText}
       slotProps={slotProps} // Handles endAdornments cleanly if provided
+      inputRef={ref}
     />
   );
 }

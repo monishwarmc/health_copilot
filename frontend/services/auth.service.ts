@@ -28,3 +28,57 @@ export const verifyEmail = (
         token,
     });
 };
+
+export const profile = (
+  full_name: string | null,
+  profile_picture: string | null
+) => {
+  return api.patch("/auth/profile", {
+    full_name,
+    profile_picture
+  })
+}
+
+export const password = (
+  old_password: string,
+  new_password: string
+) => {
+  return api.patch("/auth/password", {
+    old_password,
+    new_password
+  })
+}
+
+export const account = (
+  password: string | null,
+  google_token: string | null
+) => {
+  return api.delete("/auth/account", {
+    data: {
+      password,
+      google_token
+    }
+  })
+}
+
+export const forgot_password = (
+  email : string
+) => {
+  return api.post(
+    "/auth/forgot-password",
+    {email:email}
+  )
+}
+
+export const reset_password = (
+  token: string,
+  new_password: string
+) => {
+  return api.post(
+    "/auth/reset-password",
+    {
+      token: token,
+      new_password: new_password
+    }
+  )
+}

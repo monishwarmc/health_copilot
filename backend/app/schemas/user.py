@@ -2,6 +2,8 @@ from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
+from app.models.enums import AuthProvider
+
 
 
 class UserResponse(BaseModel):
@@ -17,3 +19,5 @@ class UserResponse(BaseModel):
     profile_picture: str | None
     
     created_at: datetime
+    
+    auth_provider: AuthProvider

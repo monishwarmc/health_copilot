@@ -71,7 +71,7 @@ class EmailService:
     
             self._send_email(
                 to_email=to_email,
-                subject="Reset your password of Health Copilot account",
+                subject="Reset your password for Health Copilot account",
                 html=html,
             )
 

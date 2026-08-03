@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -11,7 +12,19 @@ import Typography from "@mui/material/Typography";
 import MarkEmailReadIcon from "@mui/icons-material/MarkEmailRead";
 import LoginIcon from "@mui/icons-material/Login";
 
-export default function CheckEmailPage() {
+interface CheckEmailPageProps {
+  title?: string;
+}
+
+export default function CheckEmailPage({ title }: CheckEmailPageProps) {
+  const searchParams = useSearchParams();
+
+  // Fallback order: Explicit prop -> URL query param -> Default text
+  const displayMessage =
+    title ||
+    searchParams.get("message") ||
+    "We've sent a verification link to your email address.";
+
   return (
     <Box
       sx={{
@@ -31,21 +44,14 @@ export default function CheckEmailPage() {
           borderRadius: 3,
         }}
       >
-        <Stack spacing={3} 
-        sx={{
-          alignItems: "center"
-        }}
-        >
-          <MarkEmailReadIcon
-            color="primary"
-            sx={{ fontSize: 70 }}
-          />
+        <Stack spacing={3} sx={{ alignItems: "center" }}>
+          <MarkEmailReadIcon color="primary" sx={{ fontSize: 70 }} />
 
           <Typography
             variant="h4"
             sx={{
-              textAlign:"center",
-              fontWeight:700
+              textAlign: "center",
+              fontWeight: 700,
             }}
           >
             Check Your Email
@@ -55,22 +61,20 @@ export default function CheckEmailPage() {
             variant="body1"
             color="text.secondary"
             sx={{
-              textAlign:"center"
+              textAlign: "center",
             }}
           >
-            Your account has been created successfully.
+            {displayMessage}
           </Typography>
 
           <Typography
             variant="body2"
             color="text.secondary"
             sx={{
-              textAlign:"center"
+              textAlign: "center",
             }}
           >
-            We've sent a verification email to your inbox.
-            <br />
-            Please click the verification link before logging in.
+            Please click the verification link
           </Typography>
 
           <Button

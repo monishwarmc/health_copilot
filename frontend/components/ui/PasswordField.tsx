@@ -8,13 +8,14 @@ import { UseFormRegisterReturn } from "react-hook-form";
 // Material UI Icons
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
-import { useState } from "react";
+import { useState, Ref } from "react";
 
 interface FormTextFieldProps {
   label: string;
   error?: boolean;
   helperText?: string;
-  registerProps: UseFormRegisterReturn; // Strictly types the React Hook Form bindings
+  registerProps: UseFormRegisterReturn;
+  ref?: Ref<HTMLInputElement>
 }
 
 export default function PasswordField({
@@ -22,6 +23,7 @@ export default function PasswordField({
   error = false,
   helperText = "",
   registerProps,
+  ref
 }: FormTextFieldProps) {
 
     const [showPassword, setShowPassword] = useState(false);
@@ -38,6 +40,7 @@ export default function PasswordField({
         fullWidth
         error={error}
         helperText={helperText}
+        inputRef={ref}
         slotProps={{
                 input: {
                     endAdornment: (

@@ -37,7 +37,7 @@ class InvalidGoogleEmailException(AppException):
     def __init__(self):
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Google email is not verified."
+            detail="Invalid google account"
         )
         
 class GoogleAccountException(AppException):
@@ -60,11 +60,4 @@ class EmailNotVerifiedException(AppException):
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Please verify your email"       
-        )
-        
-class EmailNotExists(AppException):
-    def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Email does not exist in the database, please register"
         )

@@ -11,7 +11,10 @@ from app.schemas.auth import (
     MessageResponse,
     VerifyEmailRequest,
     ForgotPasswordRequest,
-    ResetPasswordRequest
+    ResetPasswordRequest,
+    ProfileUpdateRequest,
+    PasswordChangeRequest,
+    AccountDeleteRequest
 )
 from app.services.auth_service import auth_service
 
@@ -30,9 +33,7 @@ router = APIRouter(
 @router.post(
     "/register",
     response_model=MessageResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Register a new user",
-    description="Creates a new local account and sends a verification email.",
+    status_code=status.HTTP_201_CREATED
 )
 def register(
     request: UserRegisterRequest,
@@ -98,7 +99,7 @@ def google_login(
 def verify_email(
     request: VerifyEmailRequest,
     db: Session = Depends(get_db),
-):
+) -> MessageResponse:
     return auth_service.verify_email(
         db=db,
         request=request,
@@ -113,8 +114,11 @@ def verify_email(
 def forgot_password(
     request: ForgotPasswordRequest,
     db: Session = Depends(get_db)
-):
-    ...
+) -> MessageResponse:
+    return auth_service.forgot_password(
+        db=db,
+        request=request
+    )
     
     
 #Reset password
@@ -125,5 +129,59 @@ def forgot_password(
 def reset_password(
     request: ResetPasswordRequest,
     db: Session = Depends(get_db)
-):
-    ...
+) -> MessageResponse:
+    return auth_service.reset_password(
+        db=db,
+        request=request
+    )
+    
+    
+#Update profile
+@router.patch(
+    "/profile",
+    response_model=UserResponse
+)
+def profile(
+    request: ProfileUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user : User = Depends(get_current_user)
+) -> UserResponse:
+    return auth_service.profile(
+        request=request,
+        db=db,
+        current_user=current_user
+    )
+    
+    
+#Password change
+@router.patch(
+    "/password",
+    response_model=MessageResponse
+)
+def password(
+    request: PasswordChangeRequest,
+    db: Session = Depends(get_db),
+    current_user : User = Depends(get_current_user)
+) -> MessageResponse:
+    return auth_service.password(
+        request=request,
+        db=db,
+        current_user=current_user
+    )
+    
+    
+#Delete account
+@router.delete(
+    "/account",
+    response_model=MessageResponse
+)
+def delete(
+    request: AccountDeleteRequest,
+    db: Session = Depends(get_db),
+    current_user : User = Depends(get_current_user)
+) -> MessageResponse:
+    return auth_service.delete(
+        request=request,
+        db=db,
+        current_user=current_user
+    )

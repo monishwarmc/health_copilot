@@ -36,3 +36,29 @@ export const loginSchema = z.object({
 });
 
 export type LoginFormData = z.infer<typeof loginSchema>;
+
+export const forgotPasswordSchema = z.object({
+    email: z
+        .email("Please enter a valid email"),
+});
+
+export type forgotFormData = z.infer<typeof forgotPasswordSchema>;
+
+
+export const reset_password_schema = z
+  .object({
+    password: z
+      .string()
+      .min(8, "Password must contain at least 8 characters"),
+
+    confirmPassword: z.string(),
+  })
+  .refine(
+    (data) => data.password === data.confirmPassword,
+    {
+      path: ["confirmPassword"],
+      message: "Passwords do not match",
+    }
+  );
+
+export type resetPasswordData = z.infer<typeof reset_password_schema>;

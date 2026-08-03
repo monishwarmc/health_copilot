@@ -25,7 +25,7 @@ import { useAuth } from "@/context/AuthContext";
 import getErrorMessage from "@/lib/error";
 
 export default function LoginForm() {
-  const { login, googleLogin } = useAuth();
+  const { login, googleAuth } = useAuth();
   const searchParams = useSearchParams();
 
   const {
@@ -39,19 +39,20 @@ export default function LoginForm() {
   });
 
   const toastShown = useRef(false);
-
+  const passwordRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const email = searchParams.get("email");
     const registered = searchParams.get("registered");
 
     if (email) {
       setValue("email", email);
+      passwordRef.current?.focus();
     }
 
     if (registered && !toastShown.current) {
         toastShown.current = true;
       toast(
-        "An account with this email already exists. Please log in."
+        "Your email already exists. Please log in."
       );
     }
   }, [searchParams, setValue]);
@@ -75,8 +76,8 @@ export default function LoginForm() {
     const toastId = toast.loading("Signing in with Google...");
 
     try {
-      await googleLogin();
-      toast.success("Logged in successfully");
+      await googleAuth()
+      toast.success("successfully logged in with google");
     } catch (e) {
       toast.error(getErrorMessage(e));
     } finally {
@@ -104,7 +105,28 @@ export default function LoginForm() {
           registerProps={register("password")}
           error={!!errors.password}
           helperText={errors.password?.message}
+          ref={passwordRef}
         />
+
+        <Stack
+          direction="row"
+          sx={{
+            justifyContent: "flex-end"
+          }}
+        >
+          <Button
+            href="/forgot-password"
+            size="small"
+            sx={{
+              textTransform: "none",
+              p: 0,
+              minWidth: 0,
+            }}
+          >
+            Forgot Password?
+          </Button>
+        </Stack>
+
 
         <Button
           type="submit"
