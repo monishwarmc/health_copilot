@@ -217,10 +217,6 @@ class AuthService:
             if user.google_id is None:
                 user.google_id = google_id
 
-            # Optional: mark it as supporting Google login
-            if user.auth_provider == AuthProvider.LOCAL:
-                user.auth_provider = AuthProvider.GOOGLE
-
             # Save Google profile picture if we don't have one
             if picture and not user.profile_picture:
                 user.profile_picture = picture
