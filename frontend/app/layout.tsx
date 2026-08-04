@@ -34,7 +34,7 @@ export default function RootLayout({
                 position="top-right"
                 toastOptions={{
                   success: {
-                    duration: 3000,
+                    duration: 5000,
                   },
                   error: {
                     duration: 7000,

@@ -1,29 +1,54 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 from app.schemas.user import UserResponse
+from pydantic import field_validator
 
 
+def validate_password(value:str):
+        if len(value) < 8:
+            raise ValueError(
+                "Password must contain at least 8 characters."
+            )
+        elif len(value) > 128:
+            raise ValueError(
+                "Password should not exceed 128 characters"
+            )
+        return value
+    
+def validate_name(value:str):
+        if len(value) < 2:
+            raise ValueError(
+                "Name must contain at least 2 characters."
+            )
+        elif len(value) > 100:
+            raise ValueError(
+                "Name should not exceed 100 characters"
+            )
+        return value
 class UserRegisterRequest(BaseModel):
     
-    full_name: str = Field(
-        min_length=2,
-        max_length=100
-    )
+    full_name: str
+    @field_validator("full_name")
+    @classmethod
+    def validate(cls, value: str):
+        return validate_name(value=value)
     
     email: EmailStr
     
-    password: str = Field(
-        min_length=8,
-        max_length=128
-    )
+    password: str
     
+    @field_validator("password")
+    @classmethod
+    def validate_(cls, value:str):
+        return validate_password(value=value)
+
+
 class UserLoginRequest(BaseModel):
-    
     email: EmailStr
-    
-    password: str = Field(
-        min_length=8,
-        max_length=128
-    )
+    password: str
+    @field_validator("password")
+    @classmethod
+    def validate(cls, value: str):
+        return validate_password(value=value)
     
 class TokenResponse(BaseModel):
     
@@ -49,37 +74,44 @@ class ForgotPasswordRequest(BaseModel):
     
 class ResetPasswordRequest(BaseModel):
     token: str
-    new_password: str = Field(
-        min_length=8,
-        max_length=128
-    )
+    new_password: str
+    @field_validator("new_password")
+    @classmethod
+    def validate(cls, value:str):
+        return validate_password(value=value)
     
     
 class ProfileUpdateRequest(BaseModel):
-    full_name: str | None = Field(
-        default=None,
-        min_length=2,
-        max_length=100
-    )
-    profile_picture: str | None
+    full_name: str | None = None
+    @field_validator("full_name")
+    @classmethod
+    def validate(cls, value: str):
+        if value is None:
+            return value
+        return validate_name(value=value)
+    profile_picture: str | None = None
     
 
 class PasswordChangeRequest(BaseModel):
-    old_password: str = Field(
-        min_length=8,
-        max_length=128
-    )
-    new_password: str = Field(
-        min_length=8,
-        max_length=128
-    )
-    
+    old_password: str 
+    @field_validator("old_password")
+    @classmethod
+    def validate(cls, value:str):
+        return validate_password(value=value)
+    new_password: str 
+    @field_validator("new_password")
+    @classmethod
+    def validate_(cls, value:str):
+        return validate_password(value=value)
+   
     
 class AccountDeleteRequest(BaseModel):
-    password: str | None = Field(
-        default=None,
-        min_length=8,
-        max_length=128
-    )
-    google_token : str | None
+    password: str | None = None
+    @field_validator("password")
+    @classmethod
+    def validate(cls, value:str):
+        if value is None:
+            return value
+        return validate_password(value=value)
+    google_token : str | None = None
         

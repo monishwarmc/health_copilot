@@ -121,6 +121,7 @@ export default function LoginForm() {
               textTransform: "none",
               p: 0,
               minWidth: 0,
+              color:"chocolate"
             }}
           >
             Forgot Password?

@@ -22,7 +22,7 @@ export default function PublicRoute({
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/profile");
+      router.replace("/dashboard");
     }
   }, [isAuthenticated, isLoading, router]);
 
