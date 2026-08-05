@@ -33,9 +33,7 @@ class UserRegisterRequest(BaseModel):
         return validate_name(value=value)
     
     email: EmailStr
-    
     password: str
-    
     @field_validator("password")
     @classmethod
     def validate_(cls, value:str):
@@ -53,7 +51,6 @@ class UserLoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     
     access_token: str
-    
     token_type: str = "bearer"
     
 class AuthResponse(BaseModel):
