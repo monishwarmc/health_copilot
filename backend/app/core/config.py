@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     
     SMTP_FROM_NAME: str
 
+    USDA_FDC_API_KEY: str
+    USDA_FDC_API_URL: str = "https://api.nal.usda.gov/fdc/v1"
+
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
