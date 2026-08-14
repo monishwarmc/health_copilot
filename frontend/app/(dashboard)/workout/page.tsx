@@ -1,8 +1,9 @@
+import UnderConstruction from '@/components/ui/UnderConstruction'
 import React from 'react'
 
 function page() {
   return (
-    <div>workout</div>
+    <UnderConstruction page='Workout'/>
   )
 }
 

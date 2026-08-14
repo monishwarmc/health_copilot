@@ -68,6 +68,7 @@ FILE: app/(auth)/check-email/page.tsx
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -78,7 +79,19 @@ import Typography from "@mui/material/Typography";
 import MarkEmailReadIcon from "@mui/icons-material/MarkEmailRead";
 import LoginIcon from "@mui/icons-material/Login";
 
-export default function CheckEmailPage() {
+interface CheckEmailPageProps {
+  title?: string;
+}
+
+export default function CheckEmailPage({ title }: CheckEmailPageProps) {
+  const searchParams = useSearchParams();
+
+  // Fallback order: Explicit prop -> URL query param -> Default text
+  const displayMessage =
+    title ||
+    searchParams.get("message") ||
+    "We've sent a verification link to your email address.";
+
   return (
     <Box
       sx={{
@@ -98,21 +111,14 @@ export default function CheckEmailPage() {
           borderRadius: 3,
         }}
       >
-        <Stack spacing={3} 
-        sx={{
-          alignItems: "center"
-        }}
-        >
-          <MarkEmailReadIcon
-            color="primary"
-            sx={{ fontSize: 70 }}
-          />
+        <Stack spacing={3} sx={{ alignItems: "center" }}>
+          <MarkEmailReadIcon color="primary" sx={{ fontSize: 70 }} />
 
           <Typography
             variant="h4"
             sx={{
-              textAlign:"center",
-              fontWeight:700
+              textAlign: "center",
+              fontWeight: 700,
             }}
           >
             Check Your Email
@@ -122,22 +128,20 @@ export default function CheckEmailPage() {
             variant="body1"
             color="text.secondary"
             sx={{
-              textAlign:"center"
+              textAlign: "center",
             }}
           >
-            Your account has been created successfully.
+            {displayMessage}
           </Typography>
 
           <Typography
             variant="body2"
             color="text.secondary"
             sx={{
-              textAlign:"center"
+              textAlign: "center",
             }}
           >
-            We've sent a verification email to your inbox.
-            <br />
-            Please click the verification link before logging in.
+            Please click the verification link
           </Typography>
 
           <Button
@@ -154,6 +158,110 @@ export default function CheckEmailPage() {
     </Box>
   );
 }
+
+
+====================================================================================================
+FILE: app/(auth)/forgot-password/page.tsx
+====================================================================================================
+
+"use client"
+
+import AuthCard from '@/components/ui/AuthCard'
+import FormTextField from '@/components/ui/FormTextField'
+import { forgotFormData, forgotPasswordSchema } from '@/schemas/auth.schema';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Button, CircularProgress, Stack, Typography } from '@mui/material'
+import { useForm } from 'react-hook-form';
+import toast from "react-hot-toast";
+import { forgot_password as forgot_password_api } from '@/services/auth.service';
+import getErrorMessage from '@/lib/error';
+import SendIcon from '@mui/icons-material/Send';
+import { useRouter } from 'next/navigation';
+
+
+function forgot_password() {
+  
+  const router = useRouter()
+
+  const {
+      register,
+      handleSubmit,
+      reset,
+      formState: { errors, isSubmitting },
+    } = useForm<forgotFormData>({
+      resolver: zodResolver(forgotPasswordSchema),
+    });
+
+  const onSubmit = async (data: forgotFormData) => {
+    const toastId = toast.loading("Sending reset password link...");
+
+    try {
+      const response = await forgot_password_api(data.email);
+      console.log(response.data.message)
+      toast.success(response.data.message);
+      router.push(`/check-email?message=${encodeURIComponent(response.data.message)}`);
+      reset();
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    } finally {
+      toast.dismiss(toastId);
+    }
+  };
+
+  return (
+    <AuthCard
+    title="Forgot password?"
+    subtitle="you need to verify your email to reset the password"
+    >
+      <form onSubmit={handleSubmit(onSubmit)}>
+      <Stack spacing={2}>
+        <FormTextField
+          label="Email"
+          type="email"
+          registerProps={register("email")}
+          error={!!errors.email}
+          helperText={errors.email?.message}
+        />
+
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={isSubmitting}
+          fullWidth
+          sx={{
+            py: 1.5,
+            mt: 1,
+          }}
+          endIcon={<SendIcon />}
+        >
+          {isSubmitting ? (
+            <Stack
+              direction="row"
+              spacing={2}
+              sx={{
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <CircularProgress
+                size={20}
+                color="inherit"
+              />
+              <Typography sx={{ fontWeight: 500 }}>
+                sending verfication email...
+              </Typography>
+            </Stack>
+          ) : (
+            "Send verification email"
+          )}
+        </Button>
+        </Stack>
+        </form>
+    </AuthCard>
+  )
+}
+
+export default forgot_password
 
 
 ====================================================================================================
@@ -221,6 +329,130 @@ function register() {
 }
 
 export default register
+
+
+====================================================================================================
+FILE: app/(auth)/reset-password/page.tsx
+====================================================================================================
+
+"use client"
+
+import AuthCard from '@/components/ui/AuthCard'
+import PasswordField from '@/components/ui/PasswordField';
+import { resetPasswordData, reset_password_schema } from '@/schemas/auth.schema';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Button, CircularProgress, Stack, Typography } from '@mui/material'
+import { useForm } from 'react-hook-form';
+import toast from "react-hot-toast";
+import { reset_password as reset_password_api } from '@/services/auth.service';
+import getErrorMessage from '@/lib/error';
+import EditIcon from '@mui/icons-material/Edit';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
+
+function reset_password() {
+
+  const searchParams = useSearchParams();
+  
+  const token = searchParams.get("token");
+  
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!token) {
+      router.replace(
+        `/check-email?message=${encodeURIComponent(
+          "Please click on a valid reset password link."
+        )}`
+      );
+    }
+  }, [token, router]);
+
+  const {
+      register,
+      handleSubmit,
+      reset,
+      formState: { errors, isSubmitting },
+    } = useForm<resetPasswordData>({
+      resolver: zodResolver(reset_password_schema),
+    });
+
+  const onSubmit = async (data: resetPasswordData) => {
+    const toastId = toast.loading("Sending reset password link...");
+
+    try {
+
+      const response = await reset_password_api(token+"", data.password);
+      toast.success(response.data.message);
+      router.replace("/login");
+      reset();
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    } finally {
+      toast.dismiss(toastId);
+    }
+  };
+
+  return (
+    <AuthCard
+    title="Forgot password?"
+    subtitle="you need to verify your email to reset the password"
+    >
+      <form onSubmit={handleSubmit(onSubmit)}>
+      <Stack spacing={2}>
+        <PasswordField
+          label="new password"
+          registerProps={register("password")}
+          error={!!errors.password}
+          helperText={errors.password?.message}
+        />
+
+        <PasswordField
+          label="re-type new password"
+          registerProps={register("confirmPassword")}
+          error={!!errors.confirmPassword}
+          helperText={errors.confirmPassword?.message}
+        />
+
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={isSubmitting}
+          fullWidth
+          sx={{
+            py: 1.5,
+            mt: 1,
+          }}
+          endIcon={<EditIcon />}
+        >
+          {isSubmitting ? (
+            <Stack
+              direction="row"
+              spacing={2}
+              sx={{
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <CircularProgress
+                size={20}
+                color="inherit"
+              />
+              <Typography sx={{ fontWeight: 500 }}>
+                resetting password...
+              </Typography>
+            </Stack>
+          ) : (
+            "reset password"
+          )}
+        </Button>
+        </Stack>
+        </form>
+    </AuthCard>
+  )
+}
+
+export default reset_password
 
 
 ====================================================================================================
@@ -433,15 +665,593 @@ export default page
 FILE: app/(dashboard)/dashboard/page.tsx
 ====================================================================================================
 
-import React from 'react'
+"use client";
 
-function page() {
-  return (
-    <div>dashboard</div>
-  )
+import { useEffect, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  Grid,
+  LinearProgress,
+  Stack,
+  Typography,
+} from "@mui/material";
+
+import AddIcon from "@mui/icons-material/Add";
+import RestaurantIcon from "@mui/icons-material/Restaurant";
+import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
+import TrendingDownIcon from "@mui/icons-material/TrendingDown";
+import MonitorWeightIcon from "@mui/icons-material/MonitorWeight";
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+
+import { useAuth } from "@/context/AuthContext";
+import getErrorMessage from "@/lib/error";
+
+import {
+  getLatestWeight,
+  getWeightStats,
+} from "@/services/weight.service";
+
+interface Weight {
+  id: string;
+  weight_kg: number;
+  notes: string | null;
+  recorded_at: string;
+  created_at: string;
 }
 
-export default page
+interface WeightStats {
+  current_weight: number;
+  starting_weight: number;
+  target_weight: number;
+  weight_change: number;
+  remaining_to_goal: number;
+  goal_progress_percent: number;
+  entries: number;
+  latest_recorded_at: string;
+}
+
+export default function DashboardPage() {
+  const { user } = useAuth();
+
+  const [latestWeight, setLatestWeight] =
+    useState<Weight | null>(null);
+
+  const [weightStats, setWeightStats] =
+    useState<WeightStats | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [latest, stats] = await Promise.all([
+          getLatestWeight(),
+          getWeightStats(),
+        ]);
+
+        setLatestWeight(latest.data);
+        setWeightStats(stats.data);
+      } catch (e) {
+        setError(getErrorMessage(e));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboard();
+  }, []);
+
+  const firstName =
+    user?.full_name?.split(" ")[0] ?? "there";
+
+  const progress = Math.min(
+    Math.max(
+      weightStats?.goal_progress_percent ?? 0,
+      0
+    ),
+    100
+  );
+
+  const weightChange =
+    weightStats?.weight_change ?? 0;
+
+  return (
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: 1400,
+        mx: "auto",
+        px: {
+          xs: 2,
+          sm: 3,
+          md: 4,
+        },
+        py: {
+          xs: 2,
+          md: 4,
+        },
+      }}
+    >
+      {/* Header */}
+      <Stack
+        direction={{
+          xs: "column",
+          sm: "row",
+        }}
+        spacing={2}
+        sx={{
+          justifyContent: "space-between",
+          alignItems: {
+            xs: "flex-start",
+            sm: "center",
+          },
+          mb: 4,
+        }}
+      >
+        <Box>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              fontSize: {
+                xs: "1.8rem",
+                sm: "2.2rem",
+              },
+            }}
+          >
+            Good to see you, {firstName} 👋
+          </Typography>
+
+          <Typography
+            color="text.secondary"
+            sx={{ mt: 0.5 }}
+          >
+            Here&apos;s your health overview.
+          </Typography>
+        </Box>
+
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          href="/weight"
+          sx={{
+            borderRadius: 3,
+            px: 2.5,
+          }}
+        >
+          Add Weight
+        </Button>
+      </Stack>
+
+      {error && (
+        <Alert
+          severity="error"
+          sx={{ mb: 3 }}
+        >
+          {error}
+        </Alert>
+      )}
+
+      {loading ? (
+        <Stack
+          sx={{
+            minHeight: 300,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <CircularProgress />
+        </Stack>
+      ) : (
+        <>
+          {/* Main statistics */}
+          <Grid
+            container
+            spacing={2.5}
+          >
+            {/* Current Weight */}
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <Card
+                sx={{
+                  height: "100%",
+                  borderRadius: 4,
+                }}
+              >
+                <CardContent sx={{ p: 3 }}>
+                  <Stack spacing={2}>
+                    <Stack
+                      direction="row"
+                      sx={{
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Typography
+                        color="text.secondary"
+                        sx={{
+                          fontWeight:600
+                        }}
+                      >
+                        Current Weight
+                      </Typography>
+
+                      <Box
+                        sx={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 3,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          bgcolor: "rgba(34,197,94,0.12)",
+                          color: "primary.main",
+                        }}
+                      >
+                        <MonitorWeightIcon />
+                      </Box>
+                    </Stack>
+
+                    <Typography
+                      variant="h3"
+                      sx={{
+                        fontWeight: 700,
+                      }}
+                    >
+                      {latestWeight
+                        ? `${latestWeight.weight_kg} kg`
+                        : "--"}
+                    </Typography>
+
+                    {latestWeight && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                      >
+                        Last recorded{" "}
+                        {new Date(
+                          latestWeight.recorded_at
+                        ).toLocaleDateString()}
+                      </Typography>
+                    )}
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Weight Change */}
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <Card
+                sx={{
+                  height: "100%",
+                  borderRadius: 4,
+                }}
+              >
+                <CardContent sx={{ p: 3 }}>
+                  <Stack spacing={2}>
+                    <Stack
+                      direction="row"
+                      sx={{
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Typography
+                        color="text.secondary"
+                        sx={{
+                          fontWeight:600
+                        }}
+                      >
+                        Weight Change
+                      </Typography>
+
+                      <Box
+                        sx={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 3,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          bgcolor: "rgba(34,197,94,0.12)",
+                          color: "primary.main",
+                        }}
+                      >
+                        <TrendingDownIcon />
+                      </Box>
+                    </Stack>
+
+                    <Typography
+                      variant="h3"
+                      sx={{
+                        fontWeight: 700,
+                      }}
+                    >
+                      {weightChange > 0
+                        ? `+${weightChange}`
+                        : weightChange}{" "}
+                      kg
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                    >
+                      Since your first recorded weight
+                    </Typography>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Goal */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Card
+                sx={{
+                  height: "100%",
+                  borderRadius: 4,
+                }}
+              >
+                <CardContent sx={{ p: 3 }}>
+                  <Stack spacing={2}>
+                    <Stack
+                      direction="row"
+                      sx={{
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Typography
+                        color="text.secondary"
+                        sx={{
+                          fontWeight:600
+                        }}
+                      >
+                        Goal Progress
+                      </Typography>
+
+                      <Typography
+                        sx={{
+                          fontWeight:600
+                        }}
+                        color="primary.main"
+                      >
+                        {Math.round(progress)}%
+                      </Typography>
+                    </Stack>
+
+                    <Typography
+                      variant="h5"
+                      sx={{
+                        fontWeight: 700,
+                      }}
+                    >
+                      {weightStats?.target_weight ?? "--"} kg
+                    </Typography>
+
+                    <LinearProgress
+                      variant="determinate"
+                      value={progress}
+                      sx={{
+                        height: 10,
+                        borderRadius: 10,
+                      }}
+                    />
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                    >
+                      {weightStats
+                        ? `${weightStats.remaining_to_goal} kg remaining`
+                        : "Set your target weight"}
+                    </Typography>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Food AI */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Card
+                sx={{
+                  borderRadius: 4,
+                  overflow: "hidden",
+                  background:
+                    "linear-gradient(135deg, #0b1630 0%, #162b52 100%)",
+                  color: "white",
+                }}
+              >
+                <CardContent sx={{ p: 3 }}>
+                  <Stack spacing={2.5}>
+                    <Box>
+                      <Typography
+                        variant="overline"
+                        sx={{
+                          opacity: 0.7,
+                          letterSpacing: 1.5,
+                        }}
+                      >
+                        Coming Soon
+                      </Typography>
+
+                      <Typography
+                        variant="h5"
+                        sx={{
+                          fontWeight:700
+                        }}
+                      >
+                        AI Meal Scanner
+                      </Typography>
+
+                      <Typography
+                        sx={{
+                          mt: 1,
+                          opacity: 0.75,
+                        }}
+                      >
+                        Take a photo of your meal and
+                        Health Copilot will analyze it
+                        automatically.
+                      </Typography>
+                    </Box>
+
+                    <Button
+                      variant="contained"
+                      disabled
+                      startIcon={<CameraAltIcon />}
+                      sx={{
+                        alignSelf: "flex-start",
+                        bgcolor: "white",
+                        color: "#0b1630",
+                        "&:hover": {
+                          bgcolor: "white",
+                        },
+                      }}
+                    >
+                      Coming Soon
+                    </Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Nutrition */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Card
+                sx={{
+                  height: "100%",
+                  borderRadius: 4,
+                }}
+              >
+                <CardContent sx={{ p: 3 }}>
+                  <Stack
+                    direction="row"
+                    spacing={2}
+                    sx={{
+                      alignItems: "center",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 50,
+                        height: 50,
+                        borderRadius: 3,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        bgcolor: "rgba(34,197,94,0.12)",
+                        color: "primary.main",
+                      }}
+                    >
+                      <RestaurantIcon />
+                    </Box>
+
+                    <Box sx={{ flex: 1 }}>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontWeight:700
+                        }}
+                      >
+                        Nutrition
+                      </Typography>
+
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                      >
+                        Your nutrition tracking will
+                        appear here.
+                      </Typography>
+                    </Box>
+
+                    <Button
+                      href="/nutrition"
+                      endIcon={<ArrowForwardIcon />}
+                    >
+                      View
+                    </Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Workout */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Card
+                sx={{
+                  height: "100%",
+                  borderRadius: 4,
+                }}
+              >
+                <CardContent sx={{ p: 3 }}>
+                  <Stack
+                    direction="row"
+                    spacing={2}
+                    sx={{
+                      alignItems: "center",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 50,
+                        height: 50,
+                        borderRadius: 3,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        bgcolor: "rgba(34,197,94,0.12)",
+                        color: "primary.main",
+                      }}
+                    >
+                      <FitnessCenterIcon />
+                    </Box>
+
+                    <Box sx={{ flex: 1 }}>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontWeight:700
+                        }}
+                      >
+                        Workouts
+                      </Typography>
+
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                      >
+                        Track your activity and
+                        workouts.
+                      </Typography>
+                    </Box>
+
+                    <Button
+                      href="/workout"
+                      endIcon={<ArrowForwardIcon />}
+                    >
+                      View
+                    </Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </>
+      )}
+    </Box>
+  );
+}
 
 
 ====================================================================================================
@@ -472,11 +1282,11 @@ export default function DashboardLayout({
 FILE: app/(dashboard)/nutrition/page.tsx
 ====================================================================================================
 
-import React from 'react'
+import UnderConstruction from '@/components/ui/UnderConstruction'
 
 function page() {
   return (
-    <div>nutrition</div>
+    <UnderConstruction page='Nutrition'/>
   )
 }
 
@@ -487,87 +1297,405 @@ export default page
 FILE: app/(dashboard)/profile/page.tsx
 ====================================================================================================
 
-"use client"
+"use client";
 
-import AuthCard from '@/components/ui/AuthCard'
-import Typography from "@mui/material/Typography";
-import Stack from "@mui/material/Stack";
+import ProfileImageCropper
+from "@/components/profile/ProfileImageCropper";
+import { useState } from "react";
+import toast from "react-hot-toast";
 
+import {
+  Button,
+  Stack,
+  Typography,
+  TextField,
+  Divider,
+  CircularProgress,
+} from "@mui/material";
+
+import LogoutIcon from "@mui/icons-material/Logout";
+import SaveIcon from "@mui/icons-material/Save";
+import LockResetIcon from "@mui/icons-material/LockReset";
+import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
+
+import Image from "next/image";
+
+import AuthCard from "@/components/ui/AuthCard";
 import { useAuth } from "@/context/AuthContext";
-import Button from '@mui/material/Button';
-import Image from 'next/image';
+import getErrorMessage from "@/lib/error";
+import { uploadImage } from "@/services/cloudinary.service";
 
-import LogoutIcon from '@mui/icons-material/Logout';
+export default function dashboard() {
+  const {
+    user,
+    logout,
+    profile,
+    password,
+    account,
+    googleVerify,
+  } = useAuth();
 
-function profile() {
+  const isLocalUser = user?.auth_provider === "local";
 
-  const { user, logout } = useAuth();
+  const [fullName, setFullName] = useState(
+    user?.full_name ?? ""
+  );
 
-  // Helper function to format ISO date string to "Day, Date Time"
-  const formatDateTimeDay = (dateString?: string) => {
-    if (!dateString) return "";
-    
-    const date = new Date(dateString);
+  const [profilePicture, setProfilePicture] = useState(
+    user?.profile_picture ?? ""
+  );
 
-    return date.toLocaleString("en-US", {
-      weekday: "long",   // e.g., "Saturday"
-      year: "numeric",   // e.g., "2026"
-      month: "short",    // e.g., "Jul"
-      day: "numeric",    // e.g., "25"
-      hour: "2-digit",   // e.g., "09"
-      minute: "2-digit", // e.g., "50"
-      second: "2-digit", // e.g., "41"
-      hour12: true,      // e.g., "PM"
+
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [loadingPassword, setLoadingPassword] = useState(false);
+  const [loadingDelete, setLoadingDelete] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const [selectedImage, setSelectedImage] =
+    useState<File | null>(null);
+
+  const [cropOpen, setCropOpen] =
+    useState(false);
+
+  const handleImageUpload = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    setSelectedImage(file);
+
+    setCropOpen(true);
+  };
+
+  const handleCropComplete = async (
+    croppedFile: File
+  ) => {
+    try {
+      setUploading(true);
+
+      const imageUrl =
+        await uploadImage(croppedFile);
+
+      await profile(
+        fullName || null,
+        imageUrl
+      );
+
+      setProfilePicture(imageUrl);
+
+      toast.success(
+        "Profile picture updated"
+      );
+    } catch (e) {
+      toast.error(
+        getErrorMessage(e)
+      );
+    } finally {
+      setUploading(false);
+      setCropOpen(false);
+    }
+  };
+
+  const formatDate = (date?: string) => {
+    if (!date) return "";
+
+    return new Date(date).toLocaleString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
     });
   };
 
   return (
     <AuthCard
-      title={""+user?.full_name}
-      subtitle={""+user?.email}
+      title={user?.full_name ?? ""}
+      subtitle={user?.email ?? ""}
+      maxwidth="md"
     >
-      <Stack
-        direction={"column"}
-        spacing={2}
-        sx={{
-          alignItems: "center",
-          justifyContent: "center"
-        }}
-      >
-        {user?.profile_picture && (
-          <Image
-            src={user.profile_picture}
-            alt='profile pic'
-            width={48}
-            height={48}
-            style={{ borderRadius: '50%' }} // Optional: makes it circular
+      <Stack spacing={3}>
+        <Stack
+          spacing={2}
+          sx={{
+            alignItems: "center",
+          }}
+        >
+          {user?.profile_picture && (
+            <Image
+              src={user.profile_picture}
+              alt="Profile"
+              width={96}
+              height={96}
+              style={{
+                borderRadius: "50%",
+              }}
+            />
+          )}
+
+          <Typography variant="body2">
+            User ID: {user?.id}
+          </Typography>
+
+          <Typography variant="body2">
+            Created: {formatDate(user?.created_at)}
+          </Typography>
+        </Stack>
+
+        <Divider />
+        <Typography variant="h6">
+          Update Profile
+        </Typography>
+
+        <TextField
+          label="Full Name"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          fullWidth
+        />
+
+        <Stack spacing={2}>
+          <Button
+            variant="outlined"
+            component="label"
+            fullWidth
+            disabled={uploading}
+          >
+            {uploading ? (
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{
+                  alignItems:"center"
+                }}
+              >
+                <CircularProgress
+                  size={20}
+                  color="inherit"
+                />
+                <Typography>
+                  Uploading...
+                </Typography>
+              </Stack>
+            ) : (
+              "Upload Profile Picture"
+            )}
+
+            <input
+              hidden
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+            />
+          </Button>
+        </Stack>
+
+        <Button
+          variant="contained"
+          startIcon={
+            loadingProfile ? (
+              <CircularProgress
+                size={20}
+                color="inherit"
+              />
+            ) : (
+              <SaveIcon />
+            )
+          }
+          disabled={loadingProfile || uploading}
+          onClick={async () => {
+            setLoadingProfile(true);
+
+            try {
+              await profile(
+                fullName || null,
+                profilePicture || null
+              );
+
+              toast.success("Profile updated successfully");
+            } catch (e) {
+              toast.error(getErrorMessage(e));
+            } finally {
+              setLoadingProfile(false);
+            }
+          }}
+        >
+          {loadingProfile ? "Updating..." : "Update Profile"}
+        </Button>
+
+        {/* Change Password Section (Local Users Only) */}
+        {isLocalUser && (
+          <>
+            <Divider />
+            <Typography variant="h6">
+              Change Password
+            </Typography>
+
+            <TextField
+              label="Current Password"
+              type="password"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              fullWidth
+            />
+
+            <TextField
+              label="New Password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              fullWidth
+            />
+
+            <Button
+              variant="contained"
+              color="warning"
+              startIcon={
+                loadingPassword ? (
+                  <CircularProgress
+                    size={20}
+                    color="inherit"
+                  />
+                ) : (
+                  <LockResetIcon />
+                )
+              }
+              disabled={loadingPassword}
+              onClick={async () => {
+                if (!oldPassword || !newPassword) {
+                  toast.error("Please enter both passwords.");
+                  return;
+                }
+
+                setLoadingPassword(true);
+
+                try {
+                  const message = await password(
+                    oldPassword,
+                    newPassword
+                  );
+
+                  toast.success(message);
+
+                  setOldPassword("");
+                  setNewPassword("");
+                } catch (e) {
+                  toast.error(getErrorMessage(e));
+                } finally {
+                  setLoadingPassword(false);
+                }
+              }}
+            >
+              {loadingPassword
+                ? "Updating Password..."
+                : "Change Password"}
+            </Button>
+          </>
+        )}
+
+        <Divider />
+        <Typography variant="h6" color="error">
+          Delete Account
+        </Typography>
+
+        <Typography variant="body2">
+          This action is permanent and cannot be undone.
+        </Typography>
+
+        {isLocalUser && (
+          <TextField
+            label="Password"
+            type="password"
+            value={deletePassword}
+            onChange={(e) => setDeletePassword(e.target.value)}
+            fullWidth
           />
         )}
-        <Typography variant="h6">
-          {formatDateTimeDay(user?.created_at)}
-        </Typography>
-        <Typography variant="h6">
-          {user?.id}
-        </Typography>
-      </Stack>
-      <Button 
-        color='warning'
-        variant='contained'
-        size='small'
-        fullWidth
-        sx={{
-          alignSelf: "center"
-        }}
-        onClick={logout}
-        endIcon={<LogoutIcon/>}
+
+        <Button
+          variant="contained"
+          color="error"
+          startIcon={
+            loadingDelete ? (
+              <CircularProgress
+                size={20}
+                color="inherit"
+              />
+            ) : (
+              <DeleteForeverIcon />
+            )
+          }
+          disabled={loadingDelete}
+          onClick={async () => {
+            // Validation check for local users before trigger
+            if (isLocalUser && !deletePassword) {
+              toast.error("Please enter your password to confirm deletion.");
+              return;
+            }
+
+            if (
+              !confirm(
+                "Are you sure you want to permanently delete your account?"
+              )
+            ) {
+              return;
+            }
+
+            setLoadingDelete(true);
+
+            try {
+              let message = "";
+
+              if (isLocalUser) {
+                message = await account(deletePassword, null);
+              } else {
+                // Execute googleVerify as a function to retrieve the ID token string
+                const idToken = await googleVerify();
+                message = await account(null, idToken);
+              }
+
+              toast.success(message);
+              logout();
+            } catch (e) {
+              toast.error(getErrorMessage(e));
+            } finally {
+              setLoadingDelete(false);
+            }
+          }}
+        >
+          {loadingDelete ? "Deleting..." : "Delete Account"}
+        </Button>
+
+        <Divider />
+
+        <Button
+          variant="contained"
+          color="warning"
+          fullWidth
+          startIcon={<LogoutIcon />}
+          onClick={logout}
         >
           Logout
-      </Button>
+        </Button>
+      </Stack>
+      <ProfileImageCropper
+    open={cropOpen}
+    image={selectedImage}
+    onCancel={() => setCropOpen(false)}
+    onSave={handleCropComplete}
+/>
     </AuthCard>
-  )
+  );
 }
-
-export default profile
 
 
 ====================================================================================================
@@ -671,7 +1799,14 @@ export default function RootLayout({
                   {children}
               <Toaster
                 position="top-right"
-                reverseOrder={false}
+                toastOptions={{
+                  success: {
+                    duration: 5000,
+                  },
+                  error: {
+                    duration: 7000,
+                  },
+                }}
               />
               </AuthProvider>
             </ThemeProvider>
@@ -859,7 +1994,7 @@ export default function PublicRoute({
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/profile");
+      router.replace("/dashboard");
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -902,6 +2037,8 @@ FILE: components/forms/LoginForm.tsx
 
 "use client";
 
+import { useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
@@ -912,8 +2049,8 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
 import CircularProgress from "@mui/material/CircularProgress";
-import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
-import LoginIcon from '@mui/icons-material/Login';
+import PersonAddAltIcon from "@mui/icons-material/PersonAddAlt";
+import LoginIcon from "@mui/icons-material/Login";
 
 // Custom Project Imports
 import { LoginFormData, loginSchema } from "@/schemas/auth.schema";
@@ -922,126 +2059,166 @@ import FormTextField from "../ui/FormTextField";
 import PasswordField from "../ui/PasswordField";
 
 import { useAuth } from "@/context/AuthContext";
+import getErrorMessage from "@/lib/error";
 
 export default function LoginForm() {
+  const { login, googleAuth } = useAuth();
+  const searchParams = useSearchParams();
 
-    const { login, googleLogin } = useAuth();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  });
 
-    const {
-      register,
-      handleSubmit,
-      reset,
-      formState: { errors, isSubmitting },
-    } = useForm<LoginFormData>({
-      resolver: zodResolver(loginSchema),
-    });
+  const toastShown = useRef(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const email = searchParams.get("email");
+    const registered = searchParams.get("registered");
 
-    const onSubmit = async (data: LoginFormData) => {
-        const toastId = toast.loading("logging in...");
-        try {
-            await login(
-                data.email,
-                data.password
-            );
-            toast.success("logged in");
-            reset();
-        } catch {
-            toast.error("Something went wrong");
-        } finally {
-            toast.dismiss(toastId); 
-        }
-    };
+    if (email) {
+      setValue("email", email);
+      passwordRef.current?.focus();
+    }
 
-    const handleGoogleSignIn = async () => {
-        const toastId = toast.loading("Signing in with Google...");
+    if (registered && !toastShown.current) {
+        toastShown.current = true;
+      toast(
+        "Your email already exists. Please log in."
+      );
+    }
+  }, [searchParams, setValue]);
 
-        try {
-            await googleLogin();
+  const onSubmit = async (data: LoginFormData) => {
+    const toastId = toast.loading("Logging in...");
 
-            toast.success("Logged in successfully");
-        } catch {
-            toast.error("Google sign in failed");
-        } finally {
-            toast.dismiss(toastId);
-        }
-    };
+    try {
+      await login(data.email, data.password);
 
-    return (
-        <form onSubmit={handleSubmit(onSubmit)}>
-            <GoogleButton onClick={handleGoogleSignIn} />
-            
-            <Divider sx={{ py: 3 }}>
-                OR
-            </Divider>
+      toast.success("Logged in successfully");
+      reset();
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    } finally {
+      toast.dismiss(toastId);
+    }
+  };
 
-            <Stack spacing={2}>
+  const handleGoogleSignIn = async () => {
+    const toastId = toast.loading("Signing in with Google...");
 
-                <FormTextField
-                    label="Email"
-                    type="email"
-                    registerProps={register("email")}
-                    error={!!errors.email}
-                    helperText={errors.email?.message}
-                />
+    try {
+      await googleAuth()
+      toast.success("successfully logged in with google");
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    } finally {
+      toast.dismiss(toastId);
+    }
+  };
 
-                <PasswordField
-                    label="Password"
-                    registerProps={register("password")}
-                    error={!!errors.password}
-                    helperText={errors.password?.message}
-                />
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <GoogleButton onClick={handleGoogleSignIn} />
 
-                <Button
-                    type="submit"
-                    variant="contained"
-                    disabled={isSubmitting}
-                    fullWidth
-                    sx={{
-                        py: 1.5,
-                        mt: 1,
-                    }}
-                    startIcon={<LoginIcon/>}
-                >
-                    {isSubmitting ? (
-                        <Stack
-                            direction="row"
-                            spacing={2}
-                            sx={{
-                                justifyContent: "center",
-                                alignItems: "center"
-                            }}
-                        >
-                            <CircularProgress
-                                size={20}
-                                color="inherit"
-                            />
-                            <Typography sx={{ fontWeight: 500 }}>
-                                logging in...
-                            </Typography>
-                        </Stack>
-                    ) : (
-                        "Login"
-                    )}
-                </Button>
-            </Stack>
-            <Typography
-                variant="body2"
-                align="center"
-                sx={{ mt: 2 }}
+      <Divider sx={{ py: 3 }}>OR</Divider>
+
+      <Stack spacing={2}>
+        <FormTextField
+          label="Email"
+          type="email"
+          registerProps={register("email")}
+          error={!!errors.email}
+          helperText={errors.email?.message}
+        />
+
+        <PasswordField
+          label="Password"
+          registerProps={register("password")}
+          error={!!errors.password}
+          helperText={errors.password?.message}
+          ref={passwordRef}
+        />
+
+        <Stack
+          direction="row"
+          sx={{
+            justifyContent: "flex-end"
+          }}
+        >
+          <Button
+            href="/forgot-password"
+            size="small"
+            sx={{
+              textTransform: "none",
+              p: 0,
+              minWidth: 0,
+              color:"chocolate"
+            }}
+          >
+            Forgot Password?
+          </Button>
+        </Stack>
+
+
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={isSubmitting}
+          fullWidth
+          sx={{
+            py: 1.5,
+            mt: 1,
+          }}
+          startIcon={<LoginIcon />}
+        >
+          {isSubmitting ? (
+            <Stack
+              direction="row"
+              spacing={2}
+              sx={{
+                justifyContent: "center",
+                alignItems: "center",
+              }}
             >
-                Don't have an account?{"  "}
-            <Button
-                variant="outlined"
-                href="/register"
-                size="small"
-                fullWidth
-                endIcon={<PersonAddAltIcon/>}
-            >Register</Button>
-            </Typography>
-        </form>
-    );
-}
+              <CircularProgress
+                size={20}
+                color="inherit"
+              />
+              <Typography sx={{ fontWeight: 500 }}>
+                Logging in...
+              </Typography>
+            </Stack>
+          ) : (
+            "Login"
+          )}
+        </Button>
+      </Stack>
 
+      <Typography
+        variant="body2"
+        align="center"
+        sx={{ mt: 2 }}
+      >
+        Don't have an account?{" "}
+        <Button
+          variant="outlined"
+          href="/register"
+          size="small"
+          fullWidth
+          endIcon={<PersonAddAltIcon />}
+        >
+          Register
+        </Button>
+      </Typography>
+    </form>
+  );
+}
 
 
 ====================================================================================================
@@ -1071,12 +2248,13 @@ import PasswordField from "../ui/PasswordField";
 
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import getErrorMessage from "@/lib/error"
 
 export default function RegisterForm() {
 
     const router = useRouter()
 
-    const {register: registerUser, googleLogin} = useAuth()
+    const {register: registerUser, googleAuth} = useAuth()
 
     const {
       register,
@@ -1097,10 +2275,19 @@ export default function RegisterForm() {
             );
 
             toast.success(message);
-            router.push("/check-email");
+            router.push(`/check-email?message=${encodeURIComponent(message)}`);
             reset();
-        } catch {
-            toast.error("Something went wrong");
+        } catch (error) {
+            let err = getErrorMessage(error)
+            if (err == "Email already registered, please login") {
+                router.replace(
+                `/login?email=${encodeURIComponent(
+                    data.email
+                )}&registered=true`
+                );
+                return;
+            }
+            toast.error(err)
         } finally {
             toast.dismiss(toastId); 
         }
@@ -1110,11 +2297,11 @@ export default function RegisterForm() {
         const toastId = toast.loading("Signing in with Google...");
 
         try {
-            await googleLogin();
-
-            toast.success("Account created successfully");
-        } catch {
-            toast.error("Google sign in failed");
+            await googleAuth()
+            toast.success("successfully signed in with google");
+        } catch(e) {
+            let err = getErrorMessage(e)
+            toast.error(err);
         } finally {
             toast.dismiss(toastId);
         }
@@ -1233,13 +2420,268 @@ FILE: components/layout/Sidebar.tsx
 
 
 ====================================================================================================
+FILE: components/profile/ProfileImageCropper.tsx
+====================================================================================================
+
+"use client";
+
+import { useState, useCallback } from "react";
+
+import Cropper, {
+  Area,
+} from "react-easy-crop";
+
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Slider,
+  Stack,
+} from "@mui/material";
+
+import getCroppedImg from "./cropImage";
+
+interface Props {
+  open: boolean;
+  image: File | null;
+
+  onCancel: () => void;
+
+  onSave: (
+    file: File
+  ) => void;
+}
+
+export default function ProfileImageCropper({
+  open,
+  image,
+  onCancel,
+  onSave,
+}: Props) {
+
+  const [crop, setCrop] = useState({
+    x: 0,
+    y: 0,
+  });
+
+  const [zoom, setZoom] = useState(1);
+
+  const [croppedAreaPixels,
+    setCroppedAreaPixels
+  ] = useState<Area>();
+
+  const onCropComplete = useCallback(
+    (
+      _: Area,
+      croppedAreaPixels: Area
+    ) => {
+      setCroppedAreaPixels(
+        croppedAreaPixels
+      );
+    },
+    []
+  );
+
+  const handleSave = async () => {
+
+    if (
+      !image ||
+      !croppedAreaPixels
+    ) return;
+
+    const croppedFile =
+      await getCroppedImg(
+        image,
+        croppedAreaPixels
+      );
+
+    onSave(croppedFile);
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onCancel}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle>
+        Crop Profile Picture
+      </DialogTitle>
+
+      <DialogContent>
+
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            height: 400,
+            background: "#111",
+          }}
+        >
+          {image && (
+            <Cropper
+              image={URL.createObjectURL(
+                image
+              )}
+
+              crop={crop}
+              zoom={zoom}
+
+              aspect={1}
+
+              cropShape="round"
+
+              showGrid={false}
+
+              onCropChange={setCrop}
+
+              onZoomChange={setZoom}
+
+              onCropComplete={
+                onCropComplete
+              }
+            />
+          )}
+        </div>
+
+        <Stack
+          sx={{
+            mt: 3,
+            px: 1,
+          }}
+        >
+          <Slider
+            min={1}
+            max={3}
+            step={0.1}
+            value={zoom}
+            onChange={(_, value) =>
+              setZoom(value as number)
+            }
+          />
+        </Stack>
+
+      </DialogContent>
+
+      <DialogActions>
+
+        <Button
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+
+        <Button
+          variant="contained"
+          onClick={handleSave}
+        >
+          Save
+        </Button>
+
+      </DialogActions>
+
+    </Dialog>
+  );
+}
+
+
+====================================================================================================
+FILE: components/profile/cropImage.ts
+====================================================================================================
+
+import { Area } from "react-easy-crop";
+
+const createImage = (
+  url: string
+): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+
+    image.addEventListener("load", () =>
+      resolve(image)
+    );
+
+    image.addEventListener("error", reject);
+
+    image.crossOrigin = "anonymous";
+
+    image.src = url;
+  });
+
+export default async function getCroppedImg(
+  file: File,
+  crop: Area
+): Promise<File> {
+  const image = await createImage(
+    URL.createObjectURL(file)
+  );
+
+  const canvas =
+    document.createElement("canvas");
+
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) {
+    throw new Error(
+      "Failed to create canvas."
+    );
+  }
+
+  canvas.width = crop.width;
+  canvas.height = crop.height;
+
+  ctx.drawImage(
+    image,
+    crop.x,
+    crop.y,
+    crop.width,
+    crop.height,
+    0,
+    0,
+    crop.width,
+    crop.height
+  );
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(
+            new Error(
+              "Image cropping failed."
+            )
+          );
+          return;
+        }
+
+        resolve(
+          new File(
+            [blob],
+            file.name,
+            {
+              type: "image/jpeg",
+            }
+          )
+        );
+      },
+      "image/jpeg",
+      0.95
+    );
+  });
+}
+
+
+====================================================================================================
 FILE: components/ui/AuthCard.tsx
 ====================================================================================================
 
 import { ReactNode } from "react";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
-import Container from "@mui/material/Container";
+import Container, { ContainerProps } from "@mui/material/Container";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -1249,16 +2691,18 @@ import Logo from "./Logo";
 interface AuthCardProps {
   title: string;
   subtitle: string;
+  maxwidth?: ContainerProps["maxWidth"];
   children: ReactNode;
 }
 
 export default function AuthCard({
   title,
   subtitle,
+  maxwidth = "sm",
   children,
 }: AuthCardProps) {
   return (
-    <Container maxWidth="sm">
+    <Container maxWidth={maxwidth}>
       <Box
         sx={{
           minHeight: "100vh",
@@ -1319,6 +2763,7 @@ FILE: components/ui/FormTextField.tsx
 "use client";
 
 import TextField, { TextFieldProps } from "@mui/material/TextField";
+import { Ref } from "react";
 import { UseFormRegisterReturn } from "react-hook-form";
 
 interface FormTextFieldProps {
@@ -1328,6 +2773,7 @@ interface FormTextFieldProps {
   helperText?: string;
   registerProps: UseFormRegisterReturn; // Strictly types the React Hook Form bindings
   slotProps?: TextFieldProps["slotProps"]; // Allows passing custom inputs like your visibility toggle buttons
+  ref?: Ref<HTMLInputElement>
 }
 
 export default function FormTextField({
@@ -1337,6 +2783,7 @@ export default function FormTextField({
   helperText = "",
   registerProps,
   slotProps,
+  ref
 }: FormTextFieldProps) {
   return (
     <TextField
@@ -1347,6 +2794,7 @@ export default function FormTextField({
       error={error}
       helperText={helperText}
       slotProps={slotProps} // Handles endAdornments cleanly if provided
+      inputRef={ref}
     />
   );
 }
@@ -1454,7 +2902,7 @@ export default function Logo({
       sx={{alignItems:"center"}}
     >
       <Image
-        src="/logo.png"
+        src="/assets/logo.png"
         alt="HealthCopilot Logo"
         width={size}
         height={size}
@@ -1488,13 +2936,14 @@ import { UseFormRegisterReturn } from "react-hook-form";
 // Material UI Icons
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
-import { useState } from "react";
+import { useState, Ref } from "react";
 
 interface FormTextFieldProps {
   label: string;
   error?: boolean;
   helperText?: string;
-  registerProps: UseFormRegisterReturn; // Strictly types the React Hook Form bindings
+  registerProps: UseFormRegisterReturn;
+  ref?: Ref<HTMLInputElement>
 }
 
 export default function PasswordField({
@@ -1502,6 +2951,7 @@ export default function PasswordField({
   error = false,
   helperText = "",
   registerProps,
+  ref
 }: FormTextFieldProps) {
 
     const [showPassword, setShowPassword] = useState(false);
@@ -1518,6 +2968,7 @@ export default function PasswordField({
         fullWidth
         error={error}
         helperText={helperText}
+        inputRef={ref}
         slotProps={{
                 input: {
                     endAdornment: (
@@ -1598,6 +3049,59 @@ export default function ThemeProvider({
 
 
 ====================================================================================================
+FILE: components/ui/UnderConstruction.tsx
+====================================================================================================
+
+import { Button } from '@mui/material'
+import Image from 'next/image'
+import Logo from './Logo'
+
+const UnderConstruction = ({ page = "This" }: { page?: string }) => {
+  return (
+    <>
+    <div className='flex flex-col justify-between items-center h-screen w-screen bg-gray-900 p-6'>
+        {/* Logo stays at the top */}
+        <div className='mt-3'>
+          <Logo />
+        </div>
+
+        {/* Center content wrapper */}
+        <div className='flex flex-col items-center justify-center gap-3 grow'>
+            <Image
+            src={"/assets/Under-construction.png"}
+            alt='under construction'
+            width={150}
+            height={100}
+            className='w-2/3 h-1/4 sm:w-1/3 sm:h-1/3 md:w-1/2 md:h-1/3'
+            loading='eager'
+            />
+            <h1 className='text-red-600 text-2xl bg-amber-400 sm:p-3 sm:rounded-3xl rounded-lg sm:m-0 m-6 p-1 text-center'>
+              {page} page is under progress... Please check back later
+            </h1>
+            <Button
+            href='/dashboard'
+            color='info'
+            variant='contained'
+            sx={{
+                p: "0.6vw"
+            }}
+            >
+                Go to Dashboard
+            </Button>
+        </div>
+
+        {/* Empty balancing spacer to keep center content perfectly centered */}
+        <div className='h-10 hidden sm:block' />
+    </div>
+    </>
+  )
+}
+
+export default UnderConstruction
+
+
+
+====================================================================================================
 FILE: context/AuthContext.tsx
 ====================================================================================================
 
@@ -1622,8 +3126,11 @@ import {
 import {
   login as loginApi,
   register as registerApi,
-  googleLogin as googleLoginApi,
-  verifyEmail as verifyEmailApi
+  verifyEmail as verifyEmailApi,
+  profile as profileApi,
+  password as passwordApi,
+  account as deleteApi,
+  googleLogin as googleLoginApi
 } from "@/services/auth.service";
 
 import { setAccessToken } from "@/lib/auth";
@@ -1646,11 +3153,27 @@ interface AuthContextType {
       password: string
   ) => Promise<string>;
 
+  account: (
+    password: string | null,
+    google_token: string | null
+  ) => Promise<string>;
+
+  profile: (
+    full_name: string | null,
+    profile_picture: string | null
+  ) => Promise<User>;
+
+  password: (
+    old_password: string,
+    new_password: string
+  ) => Promise<string>;
+
   verifyEmail: (
       token: string
   ) => Promise<string>;
 
-  googleLogin: () => Promise<void>;
+  googleAuth: () => Promise<void>;
+  googleVerify: () => Promise<string>;
 
   refreshUser: () => Promise<void>;
 
@@ -1672,7 +3195,7 @@ export function AuthProvider({
   const [isLoading, setIsLoading] = useState(true);
 
   const googlePromise = useRef<{
-    resolve?: () => void;
+    resolve?: (idToken: string) => void;
     reject?: (error: unknown) => void;
   }>({});
 
@@ -1699,14 +3222,11 @@ export function AuthProvider({
       email: string,
       password: string
   ): Promise<string> => {
-
       const response = await registerApi({
-          full_name,
-          email,
-          password,
+        full_name,
+        email,
+        password,
       });
-      console.log(response)
-
       return response.data.message;
   };
 
@@ -1721,6 +3241,42 @@ export function AuthProvider({
       return response.data.message;
   };
 
+  const profile = async(
+    full_name: string | null,
+    profile_picture: string | null
+  ): Promise<User> => {
+    const response = await profileApi(
+      full_name,
+      profile_picture
+    )
+    setUser(response.data);
+    return response.data;
+  }
+
+  const password = async(
+    old_password: string,
+    new_password: string
+  ): Promise<string> => {
+    const response = await passwordApi(
+      old_password,
+      new_password
+    )
+    return response.data.message;
+  }
+
+  const account = async(
+    password: string | null,
+    google_token: string | null
+  ): Promise<string> => {
+    const reponse = await deleteApi(
+      password,
+      google_token
+    )
+    removeAccessToken();
+    setUser(null);
+    return reponse.data.message;
+  }
+
   useEffect(() => {
     if (googleInitialized.current) return;
 
@@ -1730,41 +3286,105 @@ export function AuthProvider({
 
     window.google.accounts.id.initialize({
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
-      callback: async (response: CredentialResponse) => {
-        try {
-          const authResponse = await googleLoginApi({
-            id_token: response.credential,
-          });
-
-          setAccessToken(
-            authResponse.data.token.access_token
-          );
-
-          setUser(authResponse.data.user);
-
-          googlePromise.current.resolve?.();
-        } catch (error) {
-          googlePromise.current.reject?.(error);
-        }
+      callback: (response: CredentialResponse) => {
+        googlePromise.current.resolve?.(
+          response.credential
+        );
       },
     });
   }, []);
 
-  const googleLogin = () => {
-    return new Promise<void>((resolve, reject) => {
-      if (!window.google) {
-        reject(new Error("Google SDK not loaded"));
-        return;
-      }
+  const googleVerify = () => {
+      return new Promise<string>((resolve, reject) => {
+        if (!window.google) {
+          reject(new Error("Google SDK not loaded"));
+          return;
+        }
 
-      googlePromise.current = {
-        resolve,
-        reject,
-      };
+        let settled = false;
 
-      window.google.accounts.id.prompt();
-    });
-  };
+        const finish = (error: Error) => {
+          if (settled) return;
+
+          settled = true;
+          clearTimeout(timeout);
+          googlePromise.current = {};
+
+          reject(error);
+        };
+
+        const timeout = setTimeout(() => {
+          finish(
+            new Error(
+              "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
+            )
+          );
+        }, 10000);
+
+        googlePromise.current = {
+          resolve: (idToken) => {
+            if (settled) return;
+
+            settled = true;
+            clearTimeout(timeout);
+            googlePromise.current = {};
+
+            resolve(idToken);
+          },
+
+          reject: (error) =>
+            finish(
+              error instanceof Error
+                ? error
+                : new Error("Google Sign-In failed.")
+            ),
+        };
+
+        window.google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed()) {
+            console.log(
+              "Google Not Displayed:",
+              notification.getNotDisplayedReason()
+            );
+
+            finish(
+              new Error(
+                "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
+              )
+            );
+            return;
+          }
+
+          if (notification.isSkippedMoment()) {
+            console.log(
+              "Google Skipped:",
+              notification.getSkippedReason()
+            );
+
+            finish(
+              new Error(
+                "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
+              )
+            );
+            return;
+          }
+
+        });
+      });
+    };
+
+    const googleAuth = async()=>{
+      const id_token = await googleVerify()
+      const response = await googleLoginApi({
+          id_token,
+      });
+
+      setAccessToken(
+          response.data.token.access_token
+      );
+
+      setUser(response.data.user);
+    }
 
     const refreshUser = async () => {
       try {
@@ -1807,7 +3427,11 @@ export function AuthProvider({
           login,
           register,
           verifyEmail,
-          googleLogin,
+          googleVerify,
+          googleAuth,
+          profile,
+          password,
+          account,
 
           refreshUser,
 
@@ -2004,6 +3628,57 @@ export function removeAccessToken(): void {
 
 
 ====================================================================================================
+FILE: lib/error.ts
+====================================================================================================
+
+// lib/error.ts
+import axios from "axios";
+
+export default function getErrorMessage(error: unknown): string {
+  const backendError = axios.isAxiosError(error)
+    ? error.response?.data
+    : undefined;
+
+  if (backendError) {
+    // FastAPI validation errors
+    if (Array.isArray(backendError.detail)) {
+      const firstError = backendError.detail[0];
+
+      if (typeof firstError === "object" && firstError?.msg) {
+        return firstError.msg.replace(/^Value error,\s*/, "");
+      }
+
+      return "Validation failed.";
+    }
+
+    // Custom backend exceptions
+    if (typeof backendError === "object" && backendError !== null) {
+      if ("msg" in backendError) {
+        return String(backendError.msg);
+      }
+
+      if (
+        "detail" in backendError &&
+        typeof backendError.detail === "string"
+      ) {
+        return backendError.detail;
+      }
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  return "An unexpected error occurred.";
+}
+
+
+====================================================================================================
 FILE: lib/utils.ts
 ====================================================================================================
 
@@ -2035,7 +3710,9 @@ const nextConfig: NextConfig = {
     "therapist-becoming-stage-hear.trycloudflare.com",
     "lh3.googleusercontent.com",
     "https://health-copilot-029n.onrender.com",
-    "https://health-copilot-rouge.vercel.app"
+    "https://health-copilot-rouge.vercel.app",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000"
   ],
   images: {
     remotePatterns: [
@@ -2044,7 +3721,16 @@ const nextConfig: NextConfig = {
         hostname: "lh3.googleusercontent.com",
         pathname: "/**",
       },
+      {
+      protocol: "https",
+      hostname: "res.cloudinary.com",
+      pathname: "/**",
+    },
     ],
+    domains: [
+    "lh3.googleusercontent.com",
+    "res.cloudinary.com",
+  ],
   },
 };
 
@@ -2075,10 +3761,13 @@ FILE: package.json
     "@mui/material-nextjs": "^9.1.1",
     "@tanstack/react-query": "^5.101.4",
     "axios": "^1.18.1",
+    "canvas": "^3.2.3",
     "jwt-decode": "^4.0.0",
     "next": "16.2.11",
+    "next-cloudinary": "^6.17.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-easy-crop": "^6.2.3",
     "react-hook-form": "^7.82.0",
     "react-hot-toast": "^2.6.0",
     "zod": "^4.4.3"
@@ -2153,6 +3842,32 @@ export const loginSchema = z.object({
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 
+export const forgotPasswordSchema = z.object({
+    email: z
+        .email("Please enter a valid email"),
+});
+
+export type forgotFormData = z.infer<typeof forgotPasswordSchema>;
+
+
+export const reset_password_schema = z
+  .object({
+    password: z
+      .string()
+      .min(8, "Password must contain at least 8 characters"),
+
+    confirmPassword: z.string(),
+  })
+  .refine(
+    (data) => data.password === data.confirmPassword,
+    {
+      path: ["confirmPassword"],
+      message: "Passwords do not match",
+    }
+  );
+
+export type resetPasswordData = z.infer<typeof reset_password_schema>;
+
 
 ====================================================================================================
 FILE: services/auth.service.ts
@@ -2189,12 +3904,100 @@ export const verifyEmail = (
     });
 };
 
+export const profile = (
+  full_name: string | null,
+  profile_picture: string | null
+) => {
+  return api.patch("/auth/profile", {
+    full_name,
+    profile_picture
+  })
+}
+
+export const password = (
+  old_password: string,
+  new_password: string
+) => {
+  return api.patch("/auth/password", {
+    old_password,
+    new_password
+  })
+}
+
+export const account = (
+  password: string | null,
+  google_token: string | null
+) => {
+  return api.delete("/auth/account", {
+    data: {
+      password,
+      google_token
+    }
+  })
+}
+
+export const forgot_password = (
+  email : string
+) => {
+  return api.post(
+    "/auth/forgot-password",
+    {email:email}
+  )
+}
+
+export const reset_password = (
+  token: string,
+  new_password: string
+) => {
+  return api.post(
+    "/auth/reset-password",
+    {
+      token: token,
+      new_password: new_password
+    }
+  )
+}
+
 
 ====================================================================================================
 FILE: services/chat.service.ts
 ====================================================================================================
 
 
+
+
+====================================================================================================
+FILE: services/cloudinary.service.ts
+====================================================================================================
+
+export const uploadImage = async (
+  file: File
+): Promise<string> => {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  formData.append(
+    "upload_preset",
+    process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!
+  );
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Image upload failed.");
+  }
+
+  const data = await response.json();
+
+  return data.secure_url;
+};
 
 
 ====================================================================================================
@@ -2215,7 +4018,60 @@ FILE: services/profile.service.ts
 FILE: services/weight.service.ts
 ====================================================================================================
 
+import api from "@/lib/api";
 
+export const getLatestWeight = () => {
+  return api.get("/weights/latest");
+};
+
+export const getWeightStats = () => {
+  return api.get("/weights/stats");
+};
+
+export const getWeights = (
+  page = 1,
+  limit = 20,
+  sort: "asc" | "desc" = "desc"
+) => {
+  return api.get("/weights", {
+    params: {
+      page,
+      limit,
+      sort,
+    },
+  });
+};
+
+export const createWeight = (
+  weight_kg: number,
+  notes?: string,
+  recorded_at?: string
+) => {
+  return api.post("/weights", {
+    weight_kg,
+    notes,
+    recorded_at,
+  });
+};
+
+export const updateWeight = (
+  weight_id: string,
+  weight_kg: number,
+  notes?: string,
+  recorded_at?: string
+) => {
+  return api.patch(`/weights/${weight_id}`, {
+    weight_kg,
+    notes,
+    recorded_at,
+  });
+};
+
+export const deleteWeight = (
+  weight_id: string
+) => {
+  return api.delete(`/weights/${weight_id}`);
+};
 
 
 ====================================================================================================
@@ -2315,7 +4171,23 @@ FILE: types/google.d.ts
 
 export {};
 
+interface PromptMomentNotification {
+  isNotDisplayed(): boolean;
+  getNotDisplayedReason(): string | undefined;
+
+  isSkippedMoment(): boolean;
+  getSkippedReason(): string | undefined;
+
+  isDismissedMoment(): boolean;
+  getDismissedReason(): string | undefined;
+}
+
 declare global {
+  interface CredentialResponse {
+    credential: string;
+    select_by: string;
+  }
+
   interface Window {
     google: {
       accounts: {
@@ -2330,15 +4202,14 @@ declare global {
             options: Record<string, unknown>
           ): void;
 
-          prompt(): void;
+          prompt(
+            callback?: (
+              notification: PromptMomentNotification
+            ) => void
+          ): void;
         };
       };
     };
-  }
-
-  interface CredentialResponse {
-    credential: string;
-    select_by: string;
   }
 }
 
@@ -2347,12 +4218,47 @@ declare global {
 FILE: types/user.ts
 ====================================================================================================
 
+export type AuthProvider = "local" | "google";
+
 export interface User {
   id: string;
   full_name: string;
   email: string;
   profile_picture: string | null;
   created_at: string;
+  auth_provider: AuthProvider;
+}
+
+
+====================================================================================================
+FILE: types/weight.ts
+====================================================================================================
+
+export interface Weight {
+  id: string;
+  weight_kg: number;
+  notes: string | null;
+  recorded_at: string;
+  created_at: string;
+}
+
+export interface WeightListResponse {
+  items: Weight[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+export interface WeightStats {
+  current_weight: number | null;
+  starting_weight: number | null;
+  target_weight: number | null;
+  weight_change: number;
+  remaining_to_goal: number | null;
+  goal_progress_percent: number;
+  entries: number;
+  latest_recorded_at: string | null;
 }
 
 

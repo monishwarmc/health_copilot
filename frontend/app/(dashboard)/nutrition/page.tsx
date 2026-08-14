@@ -1,8 +1,8 @@
-import React from 'react'
+import UnderConstruction from '@/components/ui/UnderConstruction'
 
 function page() {
   return (
-    <div>nutrition</div>
+    <UnderConstruction page='Nutrition'/>
   )
 }
 

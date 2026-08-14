@@ -20,7 +20,7 @@ export default function Logo({
       sx={{alignItems:"center"}}
     >
       <Image
-        src="/logo.png"
+        src="/assets/logo.png"
         alt="HealthCopilot Logo"
         width={size}
         height={size}

@@ -1,8 +1,9 @@
 import Loading from '@/components/ui/Loading'
+import UnderConstruction from '@/components/ui/UnderConstruction'
 
 function page() {
   return (
-    <Loading title='please wait'/>
+    <UnderConstruction page='AI chat'/>
   )
 }
 

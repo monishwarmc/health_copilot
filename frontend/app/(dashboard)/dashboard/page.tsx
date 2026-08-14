@@ -1,399 +1,917 @@
 "use client";
 
-import ProfileImageCropper
-from "@/components/profile/ProfileImageCropper";
-import { useState } from "react";
-import toast from "react-hot-toast";
-
+import { useEffect, useMemo, useState } from "react";
 import {
-  Button,
+  Alert,
+  Box,
+  Card,
+  CardContent,
+  CircularProgress,
+  Divider,
+  LinearProgress,
   Stack,
   Typography,
-  TextField,
-  Divider,
-  CircularProgress,
 } from "@mui/material";
 
-import LogoutIcon from "@mui/icons-material/Logout";
-import SaveIcon from "@mui/icons-material/Save";
-import LockResetIcon from "@mui/icons-material/LockReset";
-import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
+import MonitorWeightOutlinedIcon from "@mui/icons-material/MonitorWeightOutlined";
+import TrendingDownOutlinedIcon from "@mui/icons-material/TrendingDownOutlined";
+import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
+import TimelineOutlinedIcon from "@mui/icons-material/TimelineOutlined";
+import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 
-import Image from "next/image";
-
-import AuthCard from "@/components/ui/AuthCard";
 import { useAuth } from "@/context/AuthContext";
-import getErrorMessage from "@/lib/error";
-import { uploadImage } from "@/services/cloudinary.service";
 
-export default function dashboard() {
-  const {
-    user,
-    logout,
-    profile,
-    password,
-    account,
-    googleVerify,
-  } = useAuth();
+import {
+  getWeights,
+  getWeightStats,
+  type Weight,
+  type WeightStats,
+} from "@/services/weight.service";
 
-  const isLocalUser = user?.auth_provider === "local";
+import WeightChart from "@/components/weight/WeightChart";
 
-  const [fullName, setFullName] = useState(
-    user?.full_name ?? ""
+export default function DashboardPage() {
+  const { user } = useAuth();
+
+  const [stats, setStats] = useState<WeightStats | null>(null);
+  const [weights, setWeights] = useState<Weight[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [statsResponse, weightsResponse] =
+          await Promise.all([
+            getWeightStats(),
+            getWeights(1, 100, "asc"),
+          ]);
+
+        if (!mounted) return;
+
+        setStats(statsResponse.data);
+        setWeights(weightsResponse.data.items);
+      } catch (error) {
+        if (!mounted) return;
+
+        console.error(error);
+        setError(
+          "Unable to load your weight information."
+        );
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadDashboard();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const latestWeight = useMemo(() => {
+    if (!weights.length) return null;
+
+    return [...weights].sort(
+      (a, b) =>
+        new Date(b.recorded_at).getTime() -
+        new Date(a.recorded_at).getTime()
+    )[0];
+  }, [weights]);
+
+  const progress = Math.min(
+    Math.max(stats?.goal_progress_percent ?? 0, 0),
+    100
   );
 
-  const [profilePicture, setProfilePicture] = useState(
-    user?.profile_picture ?? ""
-  );
+  const weightChange = stats?.weight_change ?? 0;
 
+  const formattedWeightChange =
+    Math.abs(weightChange).toFixed(1);
 
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [deletePassword, setDeletePassword] = useState("");
-
-  const [loadingProfile, setLoadingProfile] = useState(false);
-  const [loadingPassword, setLoadingPassword] = useState(false);
-  const [loadingDelete, setLoadingDelete] = useState(false);
-  const [uploading, setUploading] = useState(false);
-
-  const [selectedImage, setSelectedImage] =
-    useState<File | null>(null);
-
-  const [cropOpen, setCropOpen] =
-    useState(false);
-
-  const handleImageUpload = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-
-    if (!file) return;
-
-    setSelectedImage(file);
-
-    setCropOpen(true);
-  };
-
-  const handleCropComplete = async (
-    croppedFile: File
-  ) => {
-    try {
-      setUploading(true);
-
-      const imageUrl =
-        await uploadImage(croppedFile);
-
-      await profile(
-        fullName || null,
-        imageUrl
-      );
-
-      setProfilePicture(imageUrl);
-
-      toast.success(
-        "Profile picture updated"
-      );
-    } catch (e) {
-      toast.error(
-        getErrorMessage(e)
-      );
-    } finally {
-      setUploading(false);
-      setCropOpen(false);
-    }
-  };
+  const isWeightLoss =
+    weightChange < 0;
 
   const formatDate = (date?: string) => {
-    if (!date) return "";
+    if (!date) return "—";
 
-    return new Date(date).toLocaleString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    });
+    return new Date(date).toLocaleDateString(
+      "en-IN",
+      {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }
+    );
   };
 
-  return (
-    <AuthCard
-      title={user?.full_name ?? ""}
-      subtitle={user?.email ?? ""}
-      maxwidth="md"
-    >
-      <Stack spacing={3}>
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          minHeight: "70vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <Stack
           spacing={2}
           sx={{
             alignItems: "center",
           }}
         >
-          {user?.profile_picture && (
-            <Image
-              src={user.profile_picture}
-              alt="Profile"
-              width={96}
-              height={96}
-              style={{
-                borderRadius: "50%",
-              }}
-            />
-          )}
+          <CircularProgress />
 
-          <Typography variant="body2">
-            User ID: {user?.id}
-          </Typography>
-
-          <Typography variant="body2">
-            Created: {formatDate(user?.created_at)}
-          </Typography>
-        </Stack>
-
-        <Divider />
-        <Typography variant="h6">
-          Update Profile
-        </Typography>
-
-        <TextField
-          label="Full Name"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          fullWidth
-        />
-
-        <Stack spacing={2}>
-          <Button
-            variant="outlined"
-            component="label"
-            fullWidth
-            disabled={uploading}
+          <Typography
+            color="text.secondary"
+            sx={{
+              fontSize: "0.95rem",
+            }}
           >
-            {uploading ? (
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{
-                  alignItems:"center"
-                }}
-              >
-                <CircularProgress
-                  size={20}
-                  color="inherit"
-                />
-                <Typography>
-                  Uploading...
-                </Typography>
-              </Stack>
-            ) : (
-              "Upload Profile Picture"
-            )}
-
-            <input
-              hidden
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-            />
-          </Button>
+            Loading your dashboard...
+          </Typography>
         </Stack>
+      </Box>
+    );
+  }
 
-        <Button
-          variant="contained"
-          startIcon={
-            loadingProfile ? (
-              <CircularProgress
-                size={20}
-                color="inherit"
-              />
-            ) : (
-              <SaveIcon />
-            )
-          }
-          disabled={loadingProfile || uploading}
-          onClick={async () => {
-            setLoadingProfile(true);
+  return (
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: 1500,
+        mx: "auto",
+        px: {
+          xs: 1.5,
+          sm: 2,
+          md: 3,
+          lg: 4,
+        },
+        py: {
+          xs: 2,
+          sm: 3,
+          md: 4,
+        },
+      }}
+    >
+      <Stack spacing={3}>
+        {/* ========================================================= */}
+        {/* HEADER */}
+        {/* ========================================================= */}
 
-            try {
-              await profile(
-                fullName || null,
-                profilePicture || null
-              );
-
-              toast.success("Profile updated successfully");
-            } catch (e) {
-              toast.error(getErrorMessage(e));
-            } finally {
-              setLoadingProfile(false);
-            }
+        <Stack
+          spacing={0.7}
+          sx={{
+            alignItems: {
+              xs: "flex-start",
+              md: "flex-start",
+            },
           }}
         >
-          {loadingProfile ? "Updating..." : "Update Profile"}
-        </Button>
+          <Typography
+            sx={{
+              fontSize: {
+                xs: "1.7rem",
+                sm: "2rem",
+                md: "2.25rem",
+              },
+              fontWeight: 800,
+              letterSpacing: "-0.04em",
+              lineHeight: 1.1,
+            }}
+          >
+            Good to see you,
+            {user?.full_name
+              ? ` ${user.full_name.split(" ")[0]}`
+              : ""}
+          </Typography>
 
-        {/* Change Password Section (Local Users Only) */}
-        {isLocalUser && (
-          <>
-            <Divider />
-            <Typography variant="h6">
-              Change Password
-            </Typography>
+          <Typography
+            color="text.secondary"
+            sx={{
+              fontSize: {
+                xs: "0.9rem",
+                sm: "0.95rem",
+              },
+            }}
+          >
+            Here is your health progress at a glance.
+          </Typography>
+        </Stack>
 
-            <TextField
-              label="Current Password"
-              type="password"
-              value={oldPassword}
-              onChange={(e) => setOldPassword(e.target.value)}
-              fullWidth
-            />
+        {/* ========================================================= */}
+        {/* ERROR */}
+        {/* ========================================================= */}
 
-            <TextField
-              label="New Password"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              fullWidth
-            />
+        {error && (
+          <Alert
+            severity="error"
+            sx={{
+              borderRadius: 3,
+            }}
+          >
+            {error}
+          </Alert>
+        )}
 
-            <Button
-              variant="contained"
-              color="warning"
-              startIcon={
-                loadingPassword ? (
-                  <CircularProgress
-                    size={20}
-                    color="inherit"
-                  />
-                ) : (
-                  <LockResetIcon />
-                )
-              }
-              disabled={loadingPassword}
-              onClick={async () => {
-                if (!oldPassword || !newPassword) {
-                  toast.error("Please enter both passwords.");
-                  return;
-                }
+        {/* ========================================================= */}
+        {/* WEIGHT OVERVIEW */}
+        {/* ========================================================= */}
 
-                setLoadingPassword(true);
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(2, 1fr)",
+              lg: "repeat(4, 1fr)",
+            },
+            gap: 2,
+          }}
+        >
+          {/* Current Weight */}
+          <StatCard
+            icon={<MonitorWeightOutlinedIcon />}
+            label="Current Weight"
+            value={stats?.current_weight}
+            suffix="kg"
+            description={
+              latestWeight
+                ? `Recorded ${formatDate(
+                    latestWeight.recorded_at
+                  )}`
+                : "No measurement yet"
+            }
+          />
 
-                try {
-                  const message = await password(
-                    oldPassword,
-                    newPassword
-                  );
+          {/* Starting Weight */}
+          <StatCard
+            icon={<TimelineOutlinedIcon />}
+            label="Starting Weight"
+            value={stats?.starting_weight}
+            suffix="kg"
+            description="Your recorded starting point"
+          />
 
-                  toast.success(message);
+          {/* Target Weight */}
+          <StatCard
+            icon={<FlagOutlinedIcon />}
+            label="Target Weight"
+            value={stats?.target_weight}
+            suffix="kg"
+            description="Your current goal"
+          />
 
-                  setOldPassword("");
-                  setNewPassword("");
-                } catch (e) {
-                  toast.error(getErrorMessage(e));
-                } finally {
-                  setLoadingPassword(false);
-                }
+          {/* Weight Change */}
+          <StatCard
+            icon={<TrendingDownOutlinedIcon />}
+            label="Weight Change"
+            value={formattedWeightChange}
+            suffix="kg"
+            description={
+              weightChange === 0
+                ? "No change yet"
+                : isWeightLoss
+                  ? "Progress since starting"
+                  : "Increase since starting"
+            }
+            positive={
+              weightChange < 0
+            }
+          />
+        </Box>
+
+        {/* ========================================================= */}
+        {/* MAIN GRID */}
+        {/* ========================================================= */}
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              lg: "minmax(0, 1.65fr) minmax(300px, 0.75fr)",
+            },
+            gap: 2.5,
+            alignItems: "stretch",
+          }}
+        >
+          {/* ======================================================= */}
+          {/* WEIGHT CHART */}
+          {/* ======================================================= */}
+
+          <WeightChart weights={weights} />
+
+          {/* ======================================================= */}
+          {/* GOAL CARD */}
+          {/* ======================================================= */}
+
+          <Card
+            elevation={0}
+            sx={{
+              height: "100%",
+              borderRadius: 4,
+              border: "1px solid",
+              borderColor: "divider",
+              overflow: "hidden",
+              background:
+                "linear-gradient(145deg, rgba(255,255,255,1) 0%, rgba(248,250,252,1) 100%)",
+            }}
+          >
+            <CardContent
+              sx={{
+                p: {
+                  xs: 2.5,
+                  sm: 3,
+                },
+                "&:last-child": {
+                  pb: {
+                    xs: 2.5,
+                    sm: 3,
+                  },
+                },
               }}
             >
-              {loadingPassword
-                ? "Updating Password..."
-                : "Change Password"}
-            </Button>
-          </>
-        )}
+              <Stack spacing={3}>
+                <Stack spacing={0.5}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 800,
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
+                    Goal Progress
+                  </Typography>
 
-        <Divider />
-        <Typography variant="h6" color="error">
-          Delete Account
-        </Typography>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    Your journey toward your target
+                    weight.
+                  </Typography>
+                </Stack>
 
-        <Typography variant="body2">
-          This action is permanent and cannot be undone.
-        </Typography>
+                {/* Progress percentage */}
+                <Stack
+                  spacing={1}
+                  sx={{
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: {
+                        xs: "3rem",
+                        sm: "3.5rem",
+                      },
+                      lineHeight: 1,
+                      fontWeight: 800,
+                      letterSpacing: "-0.05em",
+                    }}
+                  >
+                    {progress.toFixed(0)}
+                    <Typography
+                      component="span"
+                      sx={{
+                        ml: 0.5,
+                        fontSize: "1.2rem",
+                        fontWeight: 700,
+                        color: "text.secondary",
+                      }}
+                    >
+                      %
+                    </Typography>
+                  </Typography>
 
-        {isLocalUser && (
-          <TextField
-            label="Password"
-            type="password"
-            value={deletePassword}
-            onChange={(e) => setDeletePassword(e.target.value)}
-            fullWidth
-          />
-        )}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    completed
+                  </Typography>
+                </Stack>
 
-        <Button
-          variant="contained"
-          color="error"
-          startIcon={
-            loadingDelete ? (
-              <CircularProgress
-                size={20}
-                color="inherit"
-              />
-            ) : (
-              <DeleteForeverIcon />
-            )
-          }
-          disabled={loadingDelete}
-          onClick={async () => {
-            // Validation check for local users before trigger
-            if (isLocalUser && !deletePassword) {
-              toast.error("Please enter your password to confirm deletion.");
-              return;
-            }
+                {/* Progress bar */}
+                <Box>
+                  <LinearProgress
+                    variant="determinate"
+                    value={progress}
+                    sx={{
+                      height: 10,
+                      borderRadius: 10,
+                      backgroundColor: "action.hover",
+                      "& .MuiLinearProgress-bar": {
+                        borderRadius: 10,
+                      },
+                    }}
+                  />
+                </Box>
 
-            if (
-              !confirm(
-                "Are you sure you want to permanently delete your account?"
-              )
-            ) {
-              return;
-            }
+                <Divider />
 
-            setLoadingDelete(true);
+                {/* Goal numbers */}
+                <Stack spacing={2}>
+                  <GoalRow
+                    label="Starting"
+                    value={stats?.starting_weight}
+                  />
 
-            try {
-              let message = "";
+                  <GoalRow
+                    label="Current"
+                    value={stats?.current_weight}
+                    emphasized
+                  />
 
-              if (isLocalUser) {
-                message = await account(deletePassword, null);
-              } else {
-                // Execute googleVerify as a function to retrieve the ID token string
-                const idToken = await googleVerify();
-                message = await account(null, idToken);
-              }
+                  <GoalRow
+                    label="Target"
+                    value={stats?.target_weight}
+                  />
 
-              toast.success(message);
-              logout();
-            } catch (e) {
-              toast.error(getErrorMessage(e));
-            } finally {
-              setLoadingDelete(false);
-            }
+                  <GoalRow
+                    label="Remaining"
+                    value={stats?.remaining_to_goal}
+                  />
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Box>
+
+        {/* ========================================================= */}
+        {/* RECENT ACTIVITY */}
+        {/* ========================================================= */}
+
+        <Card
+          elevation={0}
+          sx={{
+            borderRadius: 4,
+            border: "1px solid",
+            borderColor: "divider",
+            backgroundColor: "background.paper",
           }}
         >
-          {loadingDelete ? "Deleting..." : "Delete Account"}
-        </Button>
+          <CardContent
+            sx={{
+              p: {
+                xs: 2,
+                sm: 3,
+              },
+              "&:last-child": {
+                pb: {
+                  xs: 2,
+                  sm: 3,
+                },
+              },
+            }}
+          >
+            <Stack spacing={2.5}>
+              <Stack
+                direction={{
+                  xs: "column",
+                  sm: "row",
+                }}
+                spacing={1}
+                sx={{
+                  alignItems: {
+                    xs: "flex-start",
+                    sm: "center",
+                  },
+                  justifyContent: "space-between",
+                }}
+              >
+                <Stack spacing={0.5}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 800,
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
+                    Latest Measurement
+                  </Typography>
 
-        <Divider />
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    Your most recent weight record.
+                  </Typography>
+                </Stack>
 
-        <Button
-          variant="contained"
-          color="warning"
-          fullWidth
-          startIcon={<LogoutIcon />}
-          onClick={logout}
+                {latestWeight && (
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      alignItems: "center",
+                    }}
+                  >
+                    <CalendarTodayOutlinedIcon
+                      sx={{
+                        fontSize: 17,
+                        color: "text.secondary",
+                      }}
+                    />
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                    >
+                      {formatDate(
+                        latestWeight.recorded_at
+                      )}
+                    </Typography>
+                  </Stack>
+                )}
+              </Stack>
+
+              <Divider />
+
+              {!latestWeight ? (
+                <Box
+                  sx={{
+                    py: 5,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textAlign: "center",
+                  }}
+                >
+                  <Stack spacing={1}>
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                      }}
+                    >
+                      No measurements yet
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                    >
+                      Add your first weight measurement
+                      to start tracking your progress.
+                    </Typography>
+                  </Stack>
+                </Box>
+              ) : (
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: {
+                      xs: "1fr",
+                      sm: "repeat(3, 1fr)",
+                    },
+                    gap: 2,
+                  }}
+                >
+                  <ActivityValue
+                    label="Weight"
+                    value={
+                      latestWeight.weight_kg.toFixed(
+                        1
+                      )
+                    }
+                    suffix="kg"
+                  />
+
+                  <ActivityValue
+                    label="Recorded"
+                    value={formatDate(
+                      latestWeight.recorded_at
+                    )}
+                  />
+
+                  <ActivityValue
+                    label="Note"
+                    value={
+                      latestWeight.notes ||
+                      "No notes"
+                    }
+                  />
+                </Box>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+
+        {/* ========================================================= */}
+        {/* FOOTER */}
+        {/* ========================================================= */}
+
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            textAlign: "center",
+            display: "block",
+            pt: 1,
+          }}
         >
-          Logout
-        </Button>
+          Keep building healthy habits, one day at a
+          time.
+        </Typography>
       </Stack>
-      <ProfileImageCropper
-    open={cropOpen}
-    image={selectedImage}
-    onCancel={() => setCropOpen(false)}
-    onSave={handleCropComplete}
-/>
-    </AuthCard>
+    </Box>
+  );
+}
+
+/* ============================================================= */
+/* STAT CARD */
+/* ============================================================= */
+
+interface StatCardProps {
+  icon: React.ReactNode;
+  label: string;
+  value?: number | string | null;
+  suffix?: string;
+  description: string;
+  positive?: boolean;
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  suffix,
+  description,
+  positive,
+}: StatCardProps) {
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        height: "100%",
+        borderRadius: 4,
+        border: "1px solid",
+        borderColor: "divider",
+        transition:
+          "transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
+        "&:hover": {
+          transform: {
+            sm: "translateY(-3px)",
+          },
+          boxShadow:
+            "0 14px 35px rgba(0,0,0,0.07)",
+          borderColor: "primary.main",
+        },
+      }}
+    >
+      <CardContent
+        sx={{
+          p: {
+            xs: 2,
+            sm: 2.5,
+          },
+          "&:last-child": {
+            pb: {
+              xs: 2,
+              sm: 2.5,
+            },
+          },
+        }}
+      >
+        <Stack spacing={2}>
+          <Box
+            sx={{
+              width: 42,
+              height: 42,
+              borderRadius: 2.5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "action.hover",
+              color: "primary.main",
+            }}
+          >
+            {icon}
+          </Box>
+
+          <Stack spacing={0.7}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                fontWeight: 600,
+              }}
+            >
+              {label}
+            </Typography>
+
+            {/* IMPORTANT:
+                number and kg are separate so they never overlap */}
+            <Stack
+              direction="row"
+              spacing={0.8}
+              sx={{
+                alignItems: "baseline",
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: {
+                    xs: "2rem",
+                    sm: "2.2rem",
+                  },
+                  lineHeight: 1,
+                  fontWeight: 800,
+                  letterSpacing: "-0.04em",
+                }}
+              >
+                {value === null ||
+                value === undefined ||
+                value === ""
+                  ? "—"
+                  : typeof value === "number"
+                    ? value.toFixed(1)
+                    : value}
+              </Typography>
+
+              {suffix && (
+                <Typography
+                  sx={{
+                    fontSize: {
+                      xs: "0.9rem",
+                      sm: "1rem",
+                    },
+                    lineHeight: 1,
+                    fontWeight: 700,
+                    color: "text.secondary",
+                  }}
+                >
+                  {suffix}
+                </Typography>
+              )}
+            </Stack>
+
+            <Typography
+              variant="caption"
+              color={
+                positive
+                  ? "success.main"
+                  : "text.secondary"
+              }
+              sx={{
+                lineHeight: 1.5,
+              }}
+            >
+              {description}
+            </Typography>
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ============================================================= */
+/* GOAL ROW */
+/* ============================================================= */
+
+interface GoalRowProps {
+  label: string;
+  value?: number | null;
+  emphasized?: boolean;
+}
+
+function GoalRow({
+  label,
+  value,
+  emphasized = false,
+}: GoalRowProps) {
+  return (
+    <Stack
+      direction="row"
+      sx={{
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+    >
+      <Typography
+        variant="body2"
+        color={
+          emphasized
+            ? "text.primary"
+            : "text.secondary"
+        }
+        sx={{
+          fontWeight: emphasized ? 700 : 500,
+        }}
+      >
+        {label}
+      </Typography>
+
+      <Stack
+        direction="row"
+        spacing={0.5}
+        sx={{
+          alignItems: "baseline",
+        }}
+      >
+        <Typography
+          sx={{
+            fontWeight: 800,
+            fontSize: "1rem",
+          }}
+        >
+          {value === null ||
+          value === undefined
+            ? "—"
+            : value.toFixed(1)}
+        </Typography>
+
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            fontWeight: 600,
+          }}
+        >
+          kg
+        </Typography>
+      </Stack>
+    </Stack>
+  );
+}
+
+/* ============================================================= */
+/* ACTIVITY VALUE */
+/* ============================================================= */
+
+interface ActivityValueProps {
+  label: string;
+  value: string;
+  suffix?: string;
+}
+
+function ActivityValue({
+  label,
+  value,
+  suffix,
+}: ActivityValueProps) {
+  return (
+    <Stack
+      spacing={0.7}
+      sx={{
+        minWidth: 0,
+      }}
+    >
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{
+          fontWeight: 600,
+        }}
+      >
+        {label}
+      </Typography>
+
+      <Stack
+        direction="row"
+        spacing={0.5}
+        sx={{
+          alignItems: "baseline",
+          minWidth: 0,
+        }}
+      >
+        <Typography
+          sx={{
+            fontWeight: 750,
+            fontSize: "1rem",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {value}
+        </Typography>
+
+        {suffix && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              fontWeight: 600,
+              flexShrink: 0,
+            }}
+          >
+            {suffix}
+          </Typography>
+        )}
+      </Stack>
+    </Stack>
   );
 }
