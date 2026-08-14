@@ -1,516 +1,532 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+
 import {
-  Alert,
   Box,
+  Button,
   Card,
   CardContent,
   CircularProgress,
-  Divider,
+  Grid,
   LinearProgress,
   Stack,
   Typography,
 } from "@mui/material";
 
 import MonitorWeightOutlinedIcon from "@mui/icons-material/MonitorWeightOutlined";
-import TrendingDownOutlinedIcon from "@mui/icons-material/TrendingDownOutlined";
-import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
-import TimelineOutlinedIcon from "@mui/icons-material/TimelineOutlined";
-import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
+import RestaurantOutlinedIcon from "@mui/icons-material/RestaurantOutlined";
+import FitnessCenterOutlinedIcon from "@mui/icons-material/FitnessCenterOutlined";
+import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 
 import { useAuth } from "@/context/AuthContext";
-
-import {
-  getWeights,
-  getWeightStats,
-  type Weight,
-  type WeightStats,
-} from "@/services/weight.service";
-
-import WeightChart from "@/components/weight/WeightChart";
+import { getWeightStats, WeightStats } from "@/services/weight.service";
 
 export default function DashboardPage() {
   const { user } = useAuth();
 
   const [stats, setStats] = useState<WeightStats | null>(null);
-  const [weights, setWeights] = useState<Weight[]>([]);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
     let mounted = true;
 
-    const loadDashboard = async () => {
+    const loadWeightStats = async () => {
       try {
-        setLoading(true);
-        setError("");
+        const response = await getWeightStats();
 
-        const [statsResponse, weightsResponse] =
-          await Promise.all([
-            getWeightStats(),
-            getWeights(1, 100, "asc"),
-          ]);
-
-        if (!mounted) return;
-
-        setStats(statsResponse.data);
-        setWeights(weightsResponse.data.items);
-      } catch (error) {
-        if (!mounted) return;
-
-        console.error(error);
-        setError(
-          "Unable to load your weight information."
-        );
+        if (mounted) {
+          setStats(response.data);
+        }
+      } catch {
+        if (mounted) {
+          setStats(null);
+        }
       } finally {
         if (mounted) {
-          setLoading(false);
+          setLoadingStats(false);
         }
       }
     };
 
-    loadDashboard();
+    loadWeightStats();
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  const latestWeight = useMemo(() => {
-    if (!weights.length) return null;
+  const firstName =
+    user?.full_name?.trim()?.split(" ")[0] || "there";
 
-    return [...weights].sort(
-      (a, b) =>
-        new Date(b.recorded_at).getTime() -
-        new Date(a.recorded_at).getTime()
-    )[0];
-  }, [weights]);
+  const hasWeightData =
+    stats != null &&
+    stats.current_weight != null;
 
-  const progress = Math.min(
-    Math.max(stats?.goal_progress_percent ?? 0, 0),
-    100
-  );
-
-  const weightChange = stats?.weight_change ?? 0;
-
-  const formattedWeightChange =
-    Math.abs(weightChange).toFixed(1);
-
-  const isWeightLoss =
-    weightChange < 0;
-
-  const formatDate = (date?: string) => {
-    if (!date) return "—";
-
-    return new Date(date).toLocaleDateString(
-      "en-IN",
-      {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }
-    );
-  };
-
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          minHeight: "70vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Stack
-          spacing={2}
-          sx={{
-            alignItems: "center",
-          }}
-        >
-          <CircularProgress />
-
-          <Typography
-            color="text.secondary"
-            sx={{
-              fontSize: "0.95rem",
-            }}
-          >
-            Loading your dashboard...
-          </Typography>
-        </Stack>
-      </Box>
-    );
-  }
+  const progress =
+    stats?.goal_progress_percent != null
+      ? Math.max(
+          0,
+          Math.min(100, stats.goal_progress_percent)
+        )
+      : 0;
 
   return (
     <Box
       sx={{
         width: "100%",
-        maxWidth: 1500,
-        mx: "auto",
-        px: {
-          xs: 1.5,
-          sm: 2,
-          md: 3,
-          lg: 4,
-        },
-        py: {
-          xs: 2,
-          sm: 3,
-          md: 4,
-        },
+        minHeight: "100%",
       }}
     >
-      <Stack spacing={3}>
-        {/* ========================================================= */}
-        {/* HEADER */}
-        {/* ========================================================= */}
-
-        <Stack
-          spacing={0.7}
-          sx={{
-            alignItems: {
-              xs: "flex-start",
-              md: "flex-start",
-            },
-          }}
-        >
-          <Typography
-            sx={{
-              fontSize: {
-                xs: "1.7rem",
-                sm: "2rem",
-                md: "2.25rem",
-              },
-              fontWeight: 800,
-              letterSpacing: "-0.04em",
-              lineHeight: 1.1,
-            }}
-          >
-            Good to see you,
-            {user?.full_name
-              ? ` ${user.full_name.split(" ")[0]}`
-              : ""}
-          </Typography>
-
-          <Typography
-            color="text.secondary"
-            sx={{
-              fontSize: {
-                xs: "0.9rem",
-                sm: "0.95rem",
-              },
-            }}
-          >
-            Here is your health progress at a glance.
-          </Typography>
-        </Stack>
-
-        {/* ========================================================= */}
-        {/* ERROR */}
-        {/* ========================================================= */}
-
-        {error && (
-          <Alert
-            severity="error"
-            sx={{
-              borderRadius: 3,
-            }}
-          >
-            {error}
-          </Alert>
-        )}
-
-        {/* ========================================================= */}
-        {/* WEIGHT OVERVIEW */}
-        {/* ========================================================= */}
-
+      <Stack spacing={{ xs: 2.5, sm: 3.5 }}>
+        {/* =========================================================
+            HERO
+        ========================================================= */}
         <Box
           sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              sm: "repeat(2, 1fr)",
-              lg: "repeat(4, 1fr)",
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: {
+              xs: 3,
+              sm: 4,
             },
-            gap: 2,
+            p: {
+              xs: 2.5,
+              sm: 4,
+              md: 5,
+            },
+            background:
+              "linear-gradient(135deg, rgba(33,150,243,0.16), rgba(124,77,255,0.10))",
+            border: "1px solid",
+            borderColor:
+              "rgba(33,150,243,0.15)",
           }}
         >
-          {/* Current Weight */}
-          <StatCard
-            icon={<MonitorWeightOutlinedIcon />}
-            label="Current Weight"
-            value={stats?.current_weight}
-            suffix="kg"
-            description={
-              latestWeight
-                ? `Recorded ${formatDate(
-                    latestWeight.recorded_at
-                  )}`
-                : "No measurement yet"
-            }
-          />
-
-          {/* Starting Weight */}
-          <StatCard
-            icon={<TimelineOutlinedIcon />}
-            label="Starting Weight"
-            value={stats?.starting_weight}
-            suffix="kg"
-            description="Your recorded starting point"
-          />
-
-          {/* Target Weight */}
-          <StatCard
-            icon={<FlagOutlinedIcon />}
-            label="Target Weight"
-            value={stats?.target_weight}
-            suffix="kg"
-            description="Your current goal"
-          />
-
-          {/* Weight Change */}
-          <StatCard
-            icon={<TrendingDownOutlinedIcon />}
-            label="Weight Change"
-            value={formattedWeightChange}
-            suffix="kg"
-            description={
-              weightChange === 0
-                ? "No change yet"
-                : isWeightLoss
-                  ? "Progress since starting"
-                  : "Increase since starting"
-            }
-            positive={
-              weightChange < 0
-            }
-          />
-        </Box>
-
-        {/* ========================================================= */}
-        {/* MAIN GRID */}
-        {/* ========================================================= */}
-
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              lg: "minmax(0, 1.65fr) minmax(300px, 0.75fr)",
-            },
-            gap: 2.5,
-            alignItems: "stretch",
-          }}
-        >
-          {/* ======================================================= */}
-          {/* WEIGHT CHART */}
-          {/* ======================================================= */}
-
-          <WeightChart weights={weights} />
-
-          {/* ======================================================= */}
-          {/* GOAL CARD */}
-          {/* ======================================================= */}
-
-          <Card
-            elevation={0}
+          {/* Glow */}
+          <Box
             sx={{
-              height: "100%",
-              borderRadius: 4,
-              border: "1px solid",
-              borderColor: "divider",
-              overflow: "hidden",
-              background:
-                "linear-gradient(145deg, rgba(255,255,255,1) 0%, rgba(248,250,252,1) 100%)",
+              position: "absolute",
+              width: {
+                xs: 180,
+                sm: 280,
+              },
+              height: {
+                xs: 180,
+                sm: 280,
+              },
+              borderRadius: "50%",
+              right: {
+                xs: -80,
+                sm: -100,
+              },
+              top: {
+                xs: -100,
+                sm: -140,
+              },
+              bgcolor: "primary.main",
+              opacity: 0.10,
+              filter: "blur(50px)",
+              pointerEvents: "none",
+            }}
+          />
+
+          <Box
+            sx={{
+              position: "relative",
+              zIndex: 1,
             }}
           >
-            <CardContent
+            <Typography
+              variant="body2"
               sx={{
-                p: {
-                  xs: 2.5,
-                  sm: 3,
-                },
-                "&:last-child": {
-                  pb: {
-                    xs: 2.5,
-                    sm: 3,
-                  },
+                color: "primary.main",
+                fontWeight: 700,
+                mb: 0.75,
+              }}
+            >
+              HEALTH COPILOT
+            </Typography>
+
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 850,
+                letterSpacing: "-0.03em",
+                fontSize: {
+                  xs: "1.7rem",
+                  sm: "2.2rem",
+                  md: "2.6rem",
                 },
               }}
             >
-              <Stack spacing={3}>
-                <Stack spacing={0.5}>
+              Welcome back, {firstName} 👋
+            </Typography>
+
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              sx={{
+                mt: 1,
+                maxWidth: 650,
+                lineHeight: 1.7,
+              }}
+            >
+              Keep building healthier habits. Your
+              personal health dashboard gives you a
+              simple view of your progress.
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* =========================================================
+            QUICK ACTIONS
+        ========================================================= */}
+        <Grid
+          container
+          spacing={{
+            xs: 1.5,
+            sm: 2,
+          }}
+        >
+          {/* Nutrition */}
+          <Grid
+            size={{
+              xs: 12,
+              sm: 4,
+            }}
+          >
+            <Card
+              elevation={0}
+              sx={{
+                height: "100%",
+                borderRadius: 3.5,
+                border: "1px solid",
+                borderColor: "divider",
+                transition:
+                  "transform 0.25s ease, box-shadow 0.25s ease",
+                "&:hover": {
+                  transform:
+                    "translateY(-3px)",
+                  boxShadow:
+                    "0 12px 30px rgba(0,0,0,0.08)",
+                },
+              }}
+            >
+              <CardContent
+                sx={{
+                  p: {
+                    xs: 2,
+                    sm: 2.5,
+                  },
+                  "&:last-child": {
+                    pb: {
+                      xs: 2,
+                      sm: 2.5,
+                    },
+                  },
+                }}
+              >
+                <Stack spacing={1.5}>
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 2.5,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      bgcolor:
+                        "rgba(76,175,80,0.10)",
+                      color: "success.main",
+                    }}
+                  >
+                    <RestaurantOutlinedIcon />
+                  </Box>
+
                   <Typography
                     variant="h6"
                     sx={{
                       fontWeight: 800,
-                      letterSpacing: "-0.02em",
                     }}
                   >
-                    Goal Progress
+                    Nutrition
                   </Typography>
 
                   <Typography
                     variant="body2"
                     color="text.secondary"
                   >
-                    Your journey toward your target
-                    weight.
+                    Nutrition tracking is coming
+                    soon.
                   </Typography>
-                </Stack>
 
-                {/* Progress percentage */}
-                <Stack
-                  spacing={1}
-                  sx={{
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography
+                  <Button
+                    disabled
+                    endIcon={
+                      <ArrowForwardRoundedIcon />
+                    }
                     sx={{
-                      fontSize: {
-                        xs: "3rem",
-                        sm: "3.5rem",
-                      },
-                      lineHeight: 1,
+                      alignSelf: "flex-start",
+                      textTransform: "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Coming soon
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Workout */}
+          <Grid
+            size={{
+              xs: 12,
+              sm: 4,
+            }}
+          >
+            <Card
+              elevation={0}
+              sx={{
+                height: "100%",
+                borderRadius: 3.5,
+                border: "1px solid",
+                borderColor: "divider",
+                transition:
+                  "transform 0.25s ease, box-shadow 0.25s ease",
+                "&:hover": {
+                  transform:
+                    "translateY(-3px)",
+                  boxShadow:
+                    "0 12px 30px rgba(0,0,0,0.08)",
+                },
+              }}
+            >
+              <CardContent
+                sx={{
+                  p: {
+                    xs: 2,
+                    sm: 2.5,
+                  },
+                  "&:last-child": {
+                    pb: {
+                      xs: 2,
+                      sm: 2.5,
+                    },
+                  },
+                }}
+              >
+                <Stack spacing={1.5}>
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 2.5,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      bgcolor:
+                        "rgba(255,152,0,0.10)",
+                      color: "warning.main",
+                    }}
+                  >
+                    <FitnessCenterOutlinedIcon />
+                  </Box>
+
+                  <Typography
+                    variant="h6"
+                    sx={{
                       fontWeight: 800,
-                      letterSpacing: "-0.05em",
                     }}
                   >
-                    {progress.toFixed(0)}
-                    <Typography
-                      component="span"
-                      sx={{
-                        ml: 0.5,
-                        fontSize: "1.2rem",
-                        fontWeight: 700,
-                        color: "text.secondary",
-                      }}
-                    >
-                      %
-                    </Typography>
+                    Workout
                   </Typography>
 
                   <Typography
                     variant="body2"
                     color="text.secondary"
                   >
-                    completed
+                    Workout tracking is coming
+                    soon.
                   </Typography>
-                </Stack>
 
-                {/* Progress bar */}
-                <Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={progress}
+                  <Button
+                    disabled
+                    endIcon={
+                      <ArrowForwardRoundedIcon />
+                    }
                     sx={{
-                      height: 10,
-                      borderRadius: 10,
-                      backgroundColor: "action.hover",
-                      "& .MuiLinearProgress-bar": {
-                        borderRadius: 10,
-                      },
+                      alignSelf: "flex-start",
+                      textTransform: "none",
+                      fontWeight: 700,
                     }}
-                  />
-                </Box>
-
-                <Divider />
-
-                {/* Goal numbers */}
-                <Stack spacing={2}>
-                  <GoalRow
-                    label="Starting"
-                    value={stats?.starting_weight}
-                  />
-
-                  <GoalRow
-                    label="Current"
-                    value={stats?.current_weight}
-                    emphasized
-                  />
-
-                  <GoalRow
-                    label="Target"
-                    value={stats?.target_weight}
-                  />
-
-                  <GoalRow
-                    label="Remaining"
-                    value={stats?.remaining_to_goal}
-                  />
+                  >
+                    Coming soon
+                  </Button>
                 </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Box>
+              </CardContent>
+            </Card>
+          </Grid>
 
-        {/* ========================================================= */}
-        {/* RECENT ACTIVITY */}
-        {/* ========================================================= */}
+          {/* AI Chat */}
+          <Grid
+            size={{
+              xs: 12,
+              sm: 4,
+            }}
+          >
+            <Card
+              elevation={0}
+              sx={{
+                height: "100%",
+                borderRadius: 3.5,
+                border: "1px solid",
+                borderColor: "divider",
+                transition:
+                  "transform 0.25s ease, box-shadow 0.25s ease",
+                "&:hover": {
+                  transform:
+                    "translateY(-3px)",
+                  boxShadow:
+                    "0 12px 30px rgba(0,0,0,0.08)",
+                },
+              }}
+            >
+              <CardContent
+                sx={{
+                  p: {
+                    xs: 2,
+                    sm: 2.5,
+                  },
+                  "&:last-child": {
+                    pb: {
+                      xs: 2,
+                      sm: 2.5,
+                    },
+                  },
+                }}
+              >
+                <Stack spacing={1.5}>
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 2.5,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      bgcolor:
+                        "rgba(124,77,255,0.10)",
+                      color: "secondary.main",
+                    }}
+                  >
+                    <ChatOutlinedIcon />
+                  </Box>
 
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 800,
+                    }}
+                  >
+                    AI Copilot
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    Talk to your AI health
+                    assistant.
+                  </Typography>
+
+                  <Button
+                    href="/chat"
+                    endIcon={
+                      <ArrowForwardRoundedIcon />
+                    }
+                    sx={{
+                      alignSelf: "flex-start",
+                      textTransform: "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Open Chat
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* =========================================================
+            WEIGHT PROGRESS
+        ========================================================= */}
         <Card
           elevation={0}
           sx={{
-            borderRadius: 4,
+            borderRadius: {
+              xs: 3,
+              sm: 4,
+            },
             border: "1px solid",
             borderColor: "divider",
-            backgroundColor: "background.paper",
+            overflow: "hidden",
+            position: "relative",
           }}
         >
+          {/* Background glow */}
+          <Box
+            sx={{
+              position: "absolute",
+              width: 240,
+              height: 240,
+              borderRadius: "50%",
+              right: -120,
+              top: -120,
+              bgcolor: "primary.main",
+              opacity: 0.06,
+              filter: "blur(45px)",
+              pointerEvents: "none",
+            }}
+          />
+
           <CardContent
             sx={{
+              position: "relative",
+              zIndex: 1,
               p: {
                 xs: 2,
                 sm: 3,
+                md: 4,
               },
               "&:last-child": {
                 pb: {
                   xs: 2,
                   sm: 3,
+                  md: 4,
                 },
               },
             }}
           >
-            <Stack spacing={2.5}>
+            <Stack spacing={3}>
+              {/* Header */}
               <Stack
                 direction={{
                   xs: "column",
                   sm: "row",
                 }}
-                spacing={1}
+                spacing={1.5}
                 sx={{
+                  justifyContent: "space-between",
                   alignItems: {
                     xs: "flex-start",
                     sm: "center",
                   },
-                  justifyContent: "space-between",
                 }}
               >
-                <Stack spacing={0.5}>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 800,
-                      letterSpacing: "-0.02em",
-                    }}
-                  >
-                    Latest Measurement
-                  </Typography>
-
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
-                    Your most recent weight record.
-                  </Typography>
-                </Stack>
-
-                {latestWeight && (
+                <Box>
                   <Stack
                     direction="row"
                     spacing={1}
@@ -518,400 +534,419 @@ export default function DashboardPage() {
                       alignItems: "center",
                     }}
                   >
-                    <CalendarTodayOutlinedIcon
+                    <MonitorWeightOutlinedIcon
                       sx={{
-                        fontSize: 17,
-                        color: "text.secondary",
+                        color: "primary.main",
                       }}
                     />
 
                     <Typography
-                      variant="body2"
-                      color="text.secondary"
+                      variant="h6"
+                      sx={{
+                        fontWeight: 850,
+                      }}
                     >
-                      {formatDate(
-                        latestWeight.recorded_at
-                      )}
+                      Weight Progress
                     </Typography>
                   </Stack>
-                )}
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      mt: 0.5,
+                    }}
+                  >
+                    Track your journey toward your
+                    goal.
+                  </Typography>
+                </Box>
+
+                <Button
+                  href="/weight"
+                  variant="outlined"
+                  endIcon={
+                    <ArrowForwardRoundedIcon />
+                  }
+                  sx={{
+                    borderRadius: 2.5,
+                    textTransform: "none",
+                    fontWeight: 700,
+                  }}
+                >
+                  Weight
+                </Button>
               </Stack>
 
-              <Divider />
-
-              {!latestWeight ? (
+              {/* Loading */}
+              {loadingStats ? (
                 <Box
                   sx={{
-                    py: 5,
+                    minHeight: 220,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <CircularProgress
+                    size={32}
+                  />
+                </Box>
+              ) : !hasWeightData ? (
+                /* =================================================
+                   EMPTY STATE
+                ================================================= */
+                <Box
+                  sx={{
+                    minHeight: {
+                      xs: 240,
+                      sm: 260,
+                    },
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     textAlign: "center",
+                    px: 2,
+                    borderRadius: 3,
+                    bgcolor: "action.hover",
                   }}
                 >
-                  <Stack spacing={1}>
-                    <Typography
+                  <Stack
+                    spacing={1.5}
+                    sx={{
+                      alignItems: "center",
+                      maxWidth: 500,
+                    }}
+                  >
+                    <Box
                       sx={{
-                        fontWeight: 700,
+                        width: 64,
+                        height: 64,
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        bgcolor:
+                          "rgba(33,150,243,0.10)",
+                        color: "primary.main",
                       }}
                     >
-                      No measurements yet
+                      <MonitorWeightOutlinedIcon
+                        sx={{
+                          fontSize: 32,
+                        }}
+                      />
+                    </Box>
+
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 850,
+                      }}
+                    >
+                      Start tracking your progress
                     </Typography>
 
                     <Typography
                       variant="body2"
                       color="text.secondary"
+                      sx={{
+                        lineHeight: 1.7,
+                      }}
                     >
-                      Add your first weight measurement
-                      to start tracking your progress.
+                      Add your first weight
+                      measurement to start seeing
+                      your progress here.
                     </Typography>
+
+                    <Button
+                      href="/weight"
+                      variant="contained"
+                      sx={{
+                        mt: 1,
+                        borderRadius: 2.5,
+                        px: 3,
+                        py: 1.1,
+                        textTransform: "none",
+                        fontWeight: 800,
+                      }}
+                    >
+                      Add Weight
+                    </Button>
                   </Stack>
                 </Box>
               ) : (
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: {
-                      xs: "1fr",
-                      sm: "repeat(3, 1fr)",
-                    },
-                    gap: 2,
-                  }}
-                >
-                  <ActivityValue
-                    label="Weight"
-                    value={
-                      latestWeight.weight_kg.toFixed(
-                        1
-                      )
-                    }
-                    suffix="kg"
-                  />
+                /* =================================================
+                   WEIGHT DATA
+                ================================================= */
+                <Stack spacing={3}>
+                  {/* Stats */}
+                  <Grid
+                    container
+                    spacing={1.5}
+                  >
+                    {/* Current */}
+                    <Grid
+                      size={{
+                        xs: 12,
+                        sm: 4,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          p: 2.5,
+                          height: "100%",
+                          borderRadius: 3,
+                          bgcolor:
+                            "action.hover",
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                        >
+                          Current Weight
+                        </Typography>
 
-                  <ActivityValue
-                    label="Recorded"
-                    value={formatDate(
-                      latestWeight.recorded_at
-                    )}
-                  />
+                        <Typography
+                          variant="h4"
+                          sx={{
+                            mt: 0.75,
+                            fontWeight: 850,
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          {stats?.current_weight !=
+                          null
+                            ? stats.current_weight.toFixed(
+                                1
+                              )
+                            : "--"}
+                          <Typography
+                            component="span"
+                            sx={{
+                              ml: 0.75,
+                              fontSize: {
+                                xs: "0.9rem",
+                                sm: "1rem",
+                              },
+                              fontWeight: 700,
+                              color:
+                                "text.secondary",
+                            }}
+                          >
+                            kg
+                          </Typography>
+                        </Typography>
+                      </Box>
+                    </Grid>
 
-                  <ActivityValue
-                    label="Note"
-                    value={
-                      latestWeight.notes ||
-                      "No notes"
-                    }
-                  />
-                </Box>
+                    {/* Starting */}
+                    <Grid
+                      size={{
+                        xs: 12,
+                        sm: 4,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          p: 2.5,
+                          height: "100%",
+                          borderRadius: 3,
+                          bgcolor:
+                            "action.hover",
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                        >
+                          Starting Weight
+                        </Typography>
+
+                        <Typography
+                          variant="h4"
+                          sx={{
+                            mt: 0.75,
+                            fontWeight: 850,
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          {stats?.starting_weight !=
+                          null
+                            ? stats.starting_weight.toFixed(
+                                1
+                              )
+                            : "--"}
+                          <Typography
+                            component="span"
+                            sx={{
+                              ml: 0.75,
+                              fontSize: {
+                                xs: "0.9rem",
+                                sm: "1rem",
+                              },
+                              fontWeight: 700,
+                              color:
+                                "text.secondary",
+                            }}
+                          >
+                            kg
+                          </Typography>
+                        </Typography>
+                      </Box>
+                    </Grid>
+
+                    {/* Goal */}
+                    <Grid
+                      size={{
+                        xs: 12,
+                        sm: 4,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          p: 2.5,
+                          height: "100%",
+                          borderRadius: 3,
+                          bgcolor:
+                            "action.hover",
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                        >
+                          Target Weight
+                        </Typography>
+
+                        <Typography
+                          variant="h4"
+                          sx={{
+                            mt: 0.75,
+                            fontWeight: 850,
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          {stats?.target_weight !=
+                          null
+                            ? stats.target_weight.toFixed(
+                                1
+                              )
+                            : "--"}
+                          <Typography
+                            component="span"
+                            sx={{
+                              ml: 0.75,
+                              fontSize: {
+                                xs: "0.9rem",
+                                sm: "1rem",
+                              },
+                              fontWeight: 700,
+                              color:
+                                "text.secondary",
+                            }}
+                          >
+                            kg
+                          </Typography>
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+
+                  {/* Progress */}
+                  {stats?.goal_progress_percent !=
+                    null && (
+                    <Box>
+                      <Stack
+                        direction="row"
+                        sx={{
+                          justifyContent:
+                            "space-between",
+                          alignItems: "center",
+                          mb: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                        >
+                          Goal Progress
+                        </Typography>
+
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 850,
+                            color:
+                              "primary.main",
+                          }}
+                        >
+                          {progress.toFixed(0)}%
+                        </Typography>
+                      </Stack>
+
+                      <LinearProgress
+                        variant="determinate"
+                        value={progress}
+                        sx={{
+                          height: 9,
+                          borderRadius: 10,
+                          bgcolor:
+                            "action.hover",
+                          "& .MuiLinearProgress-bar":
+                            {
+                              borderRadius: 10,
+                              transition:
+                                "transform 0.8s ease",
+                            },
+                        }}
+                      />
+                    </Box>
+                  )}
+
+                  {/* Change */}
+                  {stats?.weight_change != null && (
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        bgcolor:
+                          stats.weight_change <= 0
+                            ? "rgba(76,175,80,0.08)"
+                            : "rgba(255,152,0,0.08)",
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                      >
+                        Overall change
+                      </Typography>
+
+                      <Typography
+                        variant="body1"
+                        sx={{
+                          mt: 0.5,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {stats.weight_change > 0
+                          ? "+"
+                          : ""}
+                        {stats.weight_change.toFixed(
+                          1
+                        )}{" "}
+                        kg
+                      </Typography>
+                    </Box>
+                  )}
+                </Stack>
               )}
             </Stack>
           </CardContent>
         </Card>
-
-        {/* ========================================================= */}
-        {/* FOOTER */}
-        {/* ========================================================= */}
-
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            textAlign: "center",
-            display: "block",
-            pt: 1,
-          }}
-        >
-          Keep building healthy habits, one day at a
-          time.
-        </Typography>
       </Stack>
     </Box>
-  );
-}
-
-/* ============================================================= */
-/* STAT CARD */
-/* ============================================================= */
-
-interface StatCardProps {
-  icon: React.ReactNode;
-  label: string;
-  value?: number | string | null;
-  suffix?: string;
-  description: string;
-  positive?: boolean;
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  suffix,
-  description,
-  positive,
-}: StatCardProps) {
-  return (
-    <Card
-      elevation={0}
-      sx={{
-        height: "100%",
-        borderRadius: 4,
-        border: "1px solid",
-        borderColor: "divider",
-        transition:
-          "transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
-        "&:hover": {
-          transform: {
-            sm: "translateY(-3px)",
-          },
-          boxShadow:
-            "0 14px 35px rgba(0,0,0,0.07)",
-          borderColor: "primary.main",
-        },
-      }}
-    >
-      <CardContent
-        sx={{
-          p: {
-            xs: 2,
-            sm: 2.5,
-          },
-          "&:last-child": {
-            pb: {
-              xs: 2,
-              sm: 2.5,
-            },
-          },
-        }}
-      >
-        <Stack spacing={2}>
-          <Box
-            sx={{
-              width: 42,
-              height: 42,
-              borderRadius: 2.5,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "action.hover",
-              color: "primary.main",
-            }}
-          >
-            {icon}
-          </Box>
-
-          <Stack spacing={0.7}>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{
-                fontWeight: 600,
-              }}
-            >
-              {label}
-            </Typography>
-
-            {/* IMPORTANT:
-                number and kg are separate so they never overlap */}
-            <Stack
-              direction="row"
-              spacing={0.8}
-              sx={{
-                alignItems: "baseline",
-              }}
-            >
-              <Typography
-                sx={{
-                  fontSize: {
-                    xs: "2rem",
-                    sm: "2.2rem",
-                  },
-                  lineHeight: 1,
-                  fontWeight: 800,
-                  letterSpacing: "-0.04em",
-                }}
-              >
-                {value === null ||
-                value === undefined ||
-                value === ""
-                  ? "—"
-                  : typeof value === "number"
-                    ? value.toFixed(1)
-                    : value}
-              </Typography>
-
-              {suffix && (
-                <Typography
-                  sx={{
-                    fontSize: {
-                      xs: "0.9rem",
-                      sm: "1rem",
-                    },
-                    lineHeight: 1,
-                    fontWeight: 700,
-                    color: "text.secondary",
-                  }}
-                >
-                  {suffix}
-                </Typography>
-              )}
-            </Stack>
-
-            <Typography
-              variant="caption"
-              color={
-                positive
-                  ? "success.main"
-                  : "text.secondary"
-              }
-              sx={{
-                lineHeight: 1.5,
-              }}
-            >
-              {description}
-            </Typography>
-          </Stack>
-        </Stack>
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ============================================================= */
-/* GOAL ROW */
-/* ============================================================= */
-
-interface GoalRowProps {
-  label: string;
-  value?: number | null;
-  emphasized?: boolean;
-}
-
-function GoalRow({
-  label,
-  value,
-  emphasized = false,
-}: GoalRowProps) {
-  return (
-    <Stack
-      direction="row"
-      sx={{
-        alignItems: "center",
-        justifyContent: "space-between",
-      }}
-    >
-      <Typography
-        variant="body2"
-        color={
-          emphasized
-            ? "text.primary"
-            : "text.secondary"
-        }
-        sx={{
-          fontWeight: emphasized ? 700 : 500,
-        }}
-      >
-        {label}
-      </Typography>
-
-      <Stack
-        direction="row"
-        spacing={0.5}
-        sx={{
-          alignItems: "baseline",
-        }}
-      >
-        <Typography
-          sx={{
-            fontWeight: 800,
-            fontSize: "1rem",
-          }}
-        >
-          {value === null ||
-          value === undefined
-            ? "—"
-            : value.toFixed(1)}
-        </Typography>
-
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            fontWeight: 600,
-          }}
-        >
-          kg
-        </Typography>
-      </Stack>
-    </Stack>
-  );
-}
-
-/* ============================================================= */
-/* ACTIVITY VALUE */
-/* ============================================================= */
-
-interface ActivityValueProps {
-  label: string;
-  value: string;
-  suffix?: string;
-}
-
-function ActivityValue({
-  label,
-  value,
-  suffix,
-}: ActivityValueProps) {
-  return (
-    <Stack
-      spacing={0.7}
-      sx={{
-        minWidth: 0,
-      }}
-    >
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{
-          fontWeight: 600,
-        }}
-      >
-        {label}
-      </Typography>
-
-      <Stack
-        direction="row"
-        spacing={0.5}
-        sx={{
-          alignItems: "baseline",
-          minWidth: 0,
-        }}
-      >
-        <Typography
-          sx={{
-            fontWeight: 750,
-            fontSize: "1rem",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {value}
-        </Typography>
-
-        {suffix && (
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{
-              fontWeight: 600,
-              flexShrink: 0,
-            }}
-          >
-            {suffix}
-          </Typography>
-        )}
-      </Stack>
-    </Stack>
   );
 }
