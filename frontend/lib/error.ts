@@ -1,36 +1,113 @@
 // lib/error.ts
+
 import axios from "axios";
 
-export default function getErrorMessage(error: unknown): string {
-  const backendError = axios.isAxiosError(error)
-    ? error.response?.data
-    : undefined;
+interface FastAPIValidationError {
+  loc?: unknown[];
+  msg?: string;
+  type?: string;
+}
 
-  if (backendError) {
-    // FastAPI validation errors
-    if (Array.isArray(backendError.detail)) {
-      const firstError = backendError.detail[0];
+interface BackendError {
+  detail?: string | FastAPIValidationError[];
+  msg?: string;
+  message?: string;
+}
 
-      if (typeof firstError === "object" && firstError?.msg) {
-        return firstError.msg.replace(/^Value error,\s*/, "");
-      }
+export default function getErrorMessage(
+  error: unknown
+): string {
+  if (axios.isAxiosError(error)) {
+    const responseData = error.response?.data;
 
-      return "Validation failed.";
+    console.error(
+      "API error status:",
+      error.response?.status
+    );
+
+    console.error(
+      "API error response:",
+      responseData
+    );
+
+    // Backend returned a plain string
+    if (typeof responseData === "string") {
+      return responseData;
     }
 
-    // Custom backend exceptions
-    if (typeof backendError === "object" && backendError !== null) {
-      if ("msg" in backendError) {
-        return String(backendError.msg);
+    if (
+      responseData &&
+      typeof responseData === "object"
+    ) {
+      const data =
+        responseData as BackendError;
+
+      // FastAPI validation errors
+      if (Array.isArray(data.detail)) {
+        const messages = data.detail
+          .map((item) => {
+            if (
+              item &&
+              typeof item === "object" &&
+              typeof item.msg === "string"
+            ) {
+              const location = Array.isArray(item.loc)
+                ? item.loc.join(" → ")
+                : "";
+
+              const message =
+                item.msg.replace(
+                  /^Value error,\s*/i,
+                  ""
+                );
+
+              return location
+                ? `${location}: ${message}`
+                : message;
+            }
+
+            return null;
+          })
+          .filter(
+            (
+              message
+            ): message is string =>
+              Boolean(message)
+          );
+
+        if (messages.length > 0) {
+          return messages.join(". ");
+        }
+
+        return "Validation failed.";
       }
 
+      // HTTPException detail
       if (
-        "detail" in backendError &&
-        typeof backendError.detail === "string"
+        typeof data.detail === "string"
       ) {
-        return backendError.detail;
+        return data.detail;
+      }
+
+      // Custom msg
+      if (
+        typeof data.msg === "string"
+      ) {
+        return data.msg;
+      }
+
+      // Custom message
+      if (
+        typeof data.message === "string"
+      ) {
+        return data.message;
       }
     }
+
+    return (
+      error.message ||
+      "Request failed."
+    );
   }
 
   if (error instanceof Error) {

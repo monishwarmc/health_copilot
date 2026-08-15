@@ -18,16 +18,10 @@ import {
   YAxis,
 } from "recharts";
 
-interface WeightEntry {
-  id: string;
-  weight_kg: number;
-  notes: string | null;
-  recorded_at: string;
-  created_at: string;
-}
+import {Weight} from "@/types/weight"
 
 interface WeightChartProps {
-  weights: WeightEntry[];
+  weights: Weight[];
 }
 
 interface ChartData {

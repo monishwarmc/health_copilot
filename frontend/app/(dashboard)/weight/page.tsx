@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import api from "@/lib/api";
+import getErrorMessage from "@/lib/error";
+import axios from "axios";
 
 import {
   Alert,
@@ -8,291 +11,863 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
+  Grid,
   IconButton,
-  MenuItem,
-  Pagination,
+  LinearProgress,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
 
 import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import ScaleIcon from "@mui/icons-material/Scale";
+import DeleteIcon from "@mui/icons-material/Delete";
+import FlagIcon from "@mui/icons-material/Flag";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import FlagIcon from "@mui/icons-material/Flag";
-
-import toast from "react-hot-toast";
+import MonitorWeightIcon from "@mui/icons-material/MonitorWeight";
+import CloseIcon from "@mui/icons-material/Close";
 
 import {
-  createWeight,
-  deleteWeight,
-  getWeightStats,
-  getWeights,
-  updateWeight,
-  type Weight,
-  type WeightStats,
-} from "@/services/weight.service";
+  Weight,
+  WeightStats,
+  WeightListResponse,
+} from "@/types/weight";
 
-import WeightChart from "@/components/weight/WeightChart";
+/* =========================================================
+   TYPES
+========================================================= */
 
-interface WeightForm {
+interface WeightFormData {
   weight_kg: string;
   notes: string;
   recorded_at: string;
 }
 
-const initialForm: WeightForm = {
-  weight_kg: "",
-  notes: "",
-  recorded_at: new Date().toISOString().slice(0, 16),
-};
+interface ProfileResponse {
+  full_name: string;
+  email: string;
+  profile_picture: string | null;
+  gender: string | null;
+  date_of_birth: string | null;
+  height_cm: number | null;
+  target_weight_kg: number | null;
+  activity_level: string | null;
+  goal: string | null;
+  diet_preference: string | null;
+  medical_conditions: string | null;
+  food_allergies: string | null;
+  bio: string | null;
+}
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function getTodayDate(): string {
+  const now = new Date();
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDate(
+  dateString: string | null | undefined
+): string {
+  if (!dateString) {
+    return "-";
+  }
+
+  const dateOnly = dateString.substring(0, 10);
+
+  const parts = dateOnly.split("-");
+
+  if (parts.length !== 3) {
+    return dateString;
+  }
+
+  const [year, month, day] = parts;
+
+  return `${day}/${month}/${year}`;
+}
+
+function getProgress(
+  current: number | null,
+  target: number | null,
+  starting: number | null
+): number {
+  if (
+    current === null ||
+    target === null ||
+    starting === null ||
+    starting === target
+  ) {
+    return 0;
+  }
+
+  const totalDistance = Math.abs(starting - target);
+  const currentDistance = Math.abs(current - target);
+
+  if (totalDistance === 0) {
+    return 100;
+  }
+
+  const progress =
+    ((totalDistance - currentDistance) / totalDistance) *
+    100;
+
+  return Math.max(0, Math.min(100, progress));
+}
+
+/* =========================================================
+   PAGE
+========================================================= */
 
 export default function WeightPage() {
+  /* -------------------------------------------------------
+     WEIGHT DATA
+  ------------------------------------------------------- */
+
   const [weights, setWeights] = useState<Weight[]>([]);
   const [stats, setStats] = useState<WeightStats | null>(null);
 
+  /* -------------------------------------------------------
+     PROFILE
+  ------------------------------------------------------- */
+
+  const [profile, setProfile] =
+    useState<ProfileResponse | null>(null);
+
+  const [targetWeight, setTargetWeight] =
+    useState<number | null>(null);
+
+  /* -------------------------------------------------------
+     LOADING
+  ------------------------------------------------------- */
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingTarget, setSavingTarget] = useState(false);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  /* -------------------------------------------------------
+     ALERTS
+  ------------------------------------------------------- */
 
-  const [form, setForm] =
-    useState<WeightForm>(initialForm);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const [showForm, setShowForm] = useState(false);
+  /* -------------------------------------------------------
+     WEIGHT DIALOG
+  ------------------------------------------------------- */
 
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [weightDialogOpen, setWeightDialogOpen] =
+    useState(false);
 
-  const [sort, setSort] =
-    useState<"asc" | "desc">("desc");
+  const [editingWeight, setEditingWeight] =
+    useState<Weight | null>(null);
 
-  const [totalPages, setTotalPages] = useState(1);
+  const [form, setForm] = useState<WeightFormData>({
+    weight_kg: "",
+    notes: "",
+    recorded_at: getTodayDate(),
+  });
 
-  const hasData = weights.length > 0;
+  /* -------------------------------------------------------
+     TARGET DIALOG
+  ------------------------------------------------------- */
 
-  const loadWeights = async () => {
+  const [targetDialogOpen, setTargetDialogOpen] =
+    useState(false);
+
+  const [targetInput, setTargetInput] = useState("");
+
+  /* =========================================================
+     LOAD DATA
+  ========================================================= */
+
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
 
-      const [weightsResponse, statsResponse] =
-        await Promise.all([
-          getWeights(page, limit, sort),
-          getWeightStats(),
-        ]);
+      const [
+        weightsResponse,
+        statsResponse,
+        profileResponse,
+      ] = await Promise.all([
+        api.get<WeightListResponse>("/weights", {
+          params: {
+            page: 1,
+            limit: 100,
+            sort: "desc",
+          },
+        }),
 
-      setWeights(
-        weightsResponse.data.items ?? []
-      );
+        api.get<WeightStats>("/weights/stats"),
 
-      setTotalPages(
-        weightsResponse.data.pages ?? 1
-      );
+        api.get<ProfileResponse>("/profile"),
+      ]);
+
+      setWeights(weightsResponse.data.items);
 
       setStats(statsResponse.data);
-    } catch (error) {
-      console.error(error);
 
-      toast.error(
-        "Unable to load weight data."
+      setProfile(profileResponse.data);
+
+      setTargetWeight(
+        profileResponse.data.target_weight_kg
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load weight data:",
+        error
+      );
+
+      if (axios.isAxiosError(error)) {
+        console.error(
+          "LOAD DATA STATUS:",
+          error.response?.status
+        );
+
+        console.error(
+          "LOAD DATA RESPONSE:",
+          error.response?.data
+        );
+      }
+
+      setError(
+        getErrorMessage(error)
       );
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadWeights();
-  }, [page, limit, sort]);
+    loadData();
+  }, [loadData]);
 
-  const resetForm = () => {
-    setForm({
-      ...initialForm,
-      recorded_at: new Date()
-        .toISOString()
-        .slice(0, 16),
-    });
+  /* =========================================================
+     TARGET WEIGHT
+  ========================================================= */
 
-    setEditingId(null);
-    setShowForm(false);
+  const openTargetDialog = () => {
+    setTargetInput(
+      targetWeight !== null
+        ? String(targetWeight)
+        : ""
+    );
+
+    setError(null);
+    setSuccess(null);
+
+    setTargetDialogOpen(true);
   };
 
-  const handleSubmit = async () => {
-    const weight = Number(form.weight_kg);
-
-    if (!form.weight_kg) {
-      toast.error("Please enter your weight.");
+  const closeTargetDialog = () => {
+    if (savingTarget) {
       return;
     }
 
-    if (
-      Number.isNaN(weight) ||
-      weight <= 0 ||
-      weight > 500
-    ) {
-      toast.error(
-        "Please enter a valid weight."
+    setTargetDialogOpen(false);
+  };
+
+  const saveTargetWeight = async () => {
+    const value = targetInput.trim();
+
+    if (!value) {
+      setError("Please enter a target weight.");
+      return;
+    }
+
+    const parsedTarget = Number(value);
+
+    if (!Number.isFinite(parsedTarget)) {
+      setError("Please enter a valid target weight.");
+      return;
+    }
+
+    if (parsedTarget <= 0) {
+      setError(
+        "Target weight must be greater than 0."
+      );
+      return;
+    }
+
+    if (parsedTarget > 500) {
+      setError(
+        "Please enter a realistic target weight."
       );
       return;
     }
 
     try {
-      setSaving(true);
+      setSavingTarget(true);
+      setError(null);
+      setSuccess(null);
 
-      const payload = {
-        weight_kg: weight,
-        notes:
-          form.notes.trim() || null,
-        recorded_at: new Date(
-          form.recorded_at
-        ).toISOString(),
-      };
-
-      if (editingId) {
-        await updateWeight(
-          editingId,
-          payload
+      const response =
+        await api.patch<ProfileResponse>(
+          "/profile",
+          {
+            target_weight_kg: parsedTarget,
+          }
         );
 
-        toast.success(
-          "Weight updated successfully."
-        );
-      } else {
-        await createWeight(payload);
+      setProfile(response.data);
 
-        toast.success(
-          "Weight added successfully."
+      setTargetWeight(
+        response.data.target_weight_kg
+      );
+
+      const statsResponse =
+        await api.get<WeightStats>(
+          "/weights/stats"
+        );
+
+      setStats(statsResponse.data);
+
+      setTargetDialogOpen(false);
+
+      setSuccess(
+        "Target weight updated successfully."
+      );
+    } catch (error) {
+      console.error(
+        "Failed to save target weight:",
+        error
+      );
+
+      if (axios.isAxiosError(error)) {
+        console.error(
+          "TARGET STATUS:",
+          error.response?.status
+        );
+
+        console.error(
+          "TARGET RESPONSE:",
+          error.response?.data
         );
       }
 
-      resetForm();
-
-      await loadWeights();
-    } catch (error) {
-      console.error(error);
-
-      toast.error(
-        "Unable to save weight."
+      setError(
+        getErrorMessage(error)
       );
+    } finally {
+      setSavingTarget(false);
+    }
+  };
+
+  /* =========================================================
+     WEIGHT DIALOG
+  ========================================================= */
+
+  const openAddWeightDialog = () => {
+    setEditingWeight(null);
+
+    setForm({
+      weight_kg: "",
+      notes: "",
+      recorded_at: getTodayDate(),
+    });
+
+    setError(null);
+    setSuccess(null);
+
+    setWeightDialogOpen(true);
+  };
+
+  const openEditWeightDialog = (
+    weight: Weight
+  ) => {
+    setEditingWeight(weight);
+
+    setForm({
+      weight_kg: String(weight.weight_kg),
+      notes: weight.notes ?? "",
+      recorded_at: weight.recorded_at
+        ? weight.recorded_at.substring(0, 10)
+        : getTodayDate(),
+    });
+
+    setError(null);
+    setSuccess(null);
+
+    setWeightDialogOpen(true);
+  };
+
+  const closeWeightDialog = () => {
+    if (saving) {
+      return;
+    }
+
+    setWeightDialogOpen(false);
+  };
+
+  /* =========================================================
+     SAVE WEIGHT
+  ========================================================= */
+
+  const saveWeight = async () => {
+    const value = form.weight_kg.trim();
+
+    /* -------------------------------------------------------
+       VALIDATE WEIGHT
+    ------------------------------------------------------- */
+
+    if (!value) {
+      setError("Please enter your weight.");
+      return;
+    }
+
+    const parsedWeight = Number(value);
+
+    if (!Number.isFinite(parsedWeight)) {
+      setError("Please enter a valid weight.");
+      return;
+    }
+
+    if (parsedWeight <= 0) {
+      setError(
+        "Weight must be greater than 0 kg."
+      );
+      return;
+    }
+
+    if (parsedWeight > 500) {
+      setError(
+        "Please enter a realistic weight."
+      );
+      return;
+    }
+
+    /* -------------------------------------------------------
+       VALIDATE DATE
+    ------------------------------------------------------- */
+
+    if (!form.recorded_at) {
+      setError("Please select a date.");
+      return;
+    }
+
+    /* -------------------------------------------------------
+       CREATE PAYLOAD
+    ------------------------------------------------------- */
+
+    const payload: {
+      weight_kg: number;
+      notes: string | null;
+      recorded_at: string;
+    } = {
+      weight_kg: parsedWeight,
+      notes: form.notes.trim() || null,
+      recorded_at: form.recorded_at.substring(0, 10),
+    };
+
+    /* -------------------------------------------------------
+       DEBUG REQUEST
+    ------------------------------------------------------- */
+
+    console.log(
+      "================================="
+    );
+
+    console.log(
+      editingWeight
+        ? "PATCH /weights"
+        : "POST /weights"
+    );
+
+    console.log(
+      "Payload:",
+      payload
+    );
+
+    console.log(
+      "JSON:",
+      JSON.stringify(payload)
+    );
+
+    console.log(
+      "================================="
+    );
+
+    try {
+      setSaving(true);
+      setError(null);
+      setSuccess(null);
+
+      /* -----------------------------------------------------
+         UPDATE EXISTING WEIGHT
+      ----------------------------------------------------- */
+
+      if (editingWeight) {
+        const response =
+          await api.patch<Weight>(
+            `/weights/${editingWeight.id}`,
+            payload
+          );
+
+        console.log(
+          "Weight update response:",
+          response.data
+        );
+
+        setSuccess(
+          "Weight entry updated successfully."
+        );
+      }
+
+      /* -----------------------------------------------------
+         CREATE NEW WEIGHT
+      ----------------------------------------------------- */
+
+      else {
+        const response =
+          await api.post<Weight>(
+            "/weights",
+            payload
+          );
+
+        console.log(
+          "Weight create response:",
+          response.data
+        );
+
+        setSuccess(
+          "Weight recorded successfully."
+        );
+      }
+
+      /* -----------------------------------------------------
+         CLOSE DIALOG
+      ----------------------------------------------------- */
+
+      setWeightDialogOpen(false);
+
+      /* -----------------------------------------------------
+         RELOAD DATA
+      ----------------------------------------------------- */
+
+      await loadData();
+
+    } catch (error: unknown) {
+
+      console.error(
+        "================================="
+      );
+
+      console.error(
+        "FAILED TO SAVE WEIGHT"
+      );
+
+      console.error(
+        "================================="
+      );
+
+      console.error(
+        "Original error:",
+        error
+      );
+
+      /* -----------------------------------------------------
+         AXIOS ERROR DETAILS
+      ----------------------------------------------------- */
+
+      if (axios.isAxiosError(error)) {
+
+        console.error(
+          "HTTP STATUS:",
+          error.response?.status
+        );
+
+        console.error(
+          "RESPONSE DATA:",
+          error.response?.data
+        );
+
+        console.error(
+          "REQUEST URL:",
+          error.config?.url
+        );
+
+        console.error(
+          "REQUEST METHOD:",
+          error.config?.method
+        );
+
+        console.error(
+          "REQUEST BODY:",
+          error.config?.data
+        );
+
+        console.error(
+          "REQUEST HEADERS:",
+          error.config?.headers
+        );
+
+        /* ---------------------------------------------------
+           FASTAPI ERROR
+        --------------------------------------------------- */
+
+        const responseData =
+          error.response?.data;
+
+        if (
+          responseData &&
+          typeof responseData === "object" &&
+          "detail" in responseData
+        ) {
+
+          const detail =
+            (
+              responseData as {
+                detail?: unknown;
+              }
+            ).detail;
+
+          console.error(
+            "FASTAPI DETAIL:",
+            detail
+          );
+
+          /* -------------------------------------------------
+             FASTAPI VALIDATION ERRORS
+          ------------------------------------------------- */
+
+          if (Array.isArray(detail)) {
+
+            const messages = detail
+              .map((item) => {
+
+                if (
+                  item &&
+                  typeof item === "object" &&
+                  "msg" in item
+                ) {
+                  return String(
+                    (
+                      item as {
+                        msg: unknown;
+                      }
+                    ).msg
+                  );
+                }
+
+                return String(item);
+              })
+              .join(", ");
+
+            setError(messages);
+          }
+
+          /* -------------------------------------------------
+             FASTAPI STRING ERROR
+          ------------------------------------------------- */
+
+          else if (
+            typeof detail === "string"
+          ) {
+            setError(detail);
+          }
+
+          /* -------------------------------------------------
+             UNKNOWN FASTAPI DETAIL
+          ------------------------------------------------- */
+
+          else {
+            setError(
+              "The server rejected the weight data."
+            );
+          }
+        }
+
+        /* ---------------------------------------------------
+           NO FASTAPI DETAIL
+        --------------------------------------------------- */
+
+        else {
+          setError(
+            getErrorMessage(error)
+          );
+        }
+      }
+
+      /* -----------------------------------------------------
+         NON-AXIOS ERROR
+      ----------------------------------------------------- */
+
+      else {
+        setError(
+          getErrorMessage(error)
+        );
+      }
+
     } finally {
       setSaving(false);
     }
   };
 
-  const handleEdit = (weight: Weight) => {
-    setEditingId(weight.id);
+  /* =========================================================
+     DELETE WEIGHT
+  ========================================================= */
 
-    setForm({
-      weight_kg: String(
-        weight.weight_kg
-      ),
-      notes: weight.notes ?? "",
-      recorded_at: new Date(
-        weight.recorded_at
-      )
-        .toISOString()
-        .slice(0, 16),
-    });
-
-    setShowForm(true);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  };
-
-  const handleDelete = async (
-    id: string
+  const deleteWeight = async (
+    weight: Weight
   ) => {
     const confirmed = window.confirm(
-      "Are you sure you want to delete this weight entry?"
+      `Delete the ${weight.weight_kg} kg entry recorded on ${formatDate(
+        weight.recorded_at
+      )}?`
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     try {
-      setDeletingId(id);
+      setError(null);
+      setSuccess(null);
 
-      await deleteWeight(id);
-
-      toast.success(
-        "Weight entry deleted."
+      await api.delete(
+        `/weights/${weight.id}`
       );
 
-      await loadWeights();
+      setSuccess(
+        "Weight entry deleted successfully."
+      );
+
+      await loadData();
+
     } catch (error) {
-      console.error(error);
-
-      toast.error(
-        "Unable to delete weight entry."
+      console.error(
+        "Failed to delete weight:",
+        error
       );
-    } finally {
-      setDeletingId(null);
+
+      if (axios.isAxiosError(error)) {
+        console.error(
+          "DELETE STATUS:",
+          error.response?.status
+        );
+
+        console.error(
+          "DELETE RESPONSE:",
+          error.response?.data
+        );
+      }
+
+      setError(
+        getErrorMessage(error)
+      );
     }
   };
 
-  const formattedLatestDate = useMemo(() => {
-    if (!stats?.latest_recorded_at) {
-      return null;
-    }
-
-    return new Date(
-      stats.latest_recorded_at
-    ).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  }, [stats]);
+  /* =========================================================
+     DERIVED DATA
+  ========================================================= */
 
   const currentWeight =
-    typeof stats?.current_weight ===
-    "number"
-      ? stats.current_weight
-      : null;
+    stats?.current_weight ?? null;
 
   const startingWeight =
-    typeof stats?.starting_weight ===
-    "number"
-      ? stats.starting_weight
-      : null;
+    stats?.starting_weight ?? null;
 
-  const targetWeight =
-    typeof stats?.target_weight ===
-    "number"
-      ? stats.target_weight
-      : null;
+  const actualTargetWeight =
+    stats?.target_weight ??
+    targetWeight ??
+    null;
 
   const weightChange =
-    typeof stats?.weight_change ===
-    "number"
-      ? stats.weight_change
-      : null;
+    stats?.weight_change ?? 0;
 
   const remainingToGoal =
-    typeof stats?.remaining_to_goal ===
-    "number"
-      ? stats.remaining_to_goal
-      : null;
-
-  const progress =
-    typeof stats?.goal_progress_percent ===
-    "number"
-      ? Math.max(
-          0,
-          Math.min(
-            100,
-            stats.goal_progress_percent
+    stats?.remaining_to_goal ??
+    (
+      currentWeight !== null &&
+      actualTargetWeight !== null
+        ? Math.abs(
+            currentWeight -
+              actualTargetWeight
           )
+        : null
+    );
+
+  const progress = useMemo(() => {
+    if (
+      stats?.goal_progress_percent !== null &&
+      stats?.goal_progress_percent !== undefined
+    ) {
+      return Math.max(
+        0,
+        Math.min(
+          100,
+          stats.goal_progress_percent
         )
-      : 0;
+      );
+    }
+
+    return getProgress(
+      currentWeight,
+      actualTargetWeight,
+      startingWeight
+    );
+  }, [
+    stats?.goal_progress_percent,
+    currentWeight,
+    actualTargetWeight,
+    startingWeight,
+  ]);
+
+  const trendIsDown =
+    weightChange < 0;
+
+  const trendIsUp =
+    weightChange > 0;
+
+  /* =========================================================
+     LOADING
+  ========================================================= */
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          minHeight: "70vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Stack
+          spacing={2}
+          sx={{
+            alignItems: "center",
+          }}
+        >
+          <CircularProgress />
+
+          <Typography color="text.secondary">
+            Loading weight data...
+          </Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
+  /* =========================================================
+     RENDER
+  ========================================================= */
 
   return (
     <Box
@@ -300,23 +875,31 @@ export default function WeightPage() {
         width: "100%",
         maxWidth: 1400,
         mx: "auto",
+        px: {
+          xs: 2,
+          md: 3,
+        },
+        py: {
+          xs: 2,
+          md: 4,
+        },
       }}
     >
-      {/* HEADER */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
+
       <Stack
+        direction={{
+          xs: "column",
+          sm: "row",
+        }}
+        spacing={2}
         sx={{
-          gap: 2,
           mb: 4,
-          flexDirection: {
-            xs: "column",
-            sm: "row",
-          },
-          justifyContent: {
-            xs: "flex-start",
-            sm: "space-between",
-          },
+          justifyContent: "space-between",
           alignItems: {
-            xs: "stretch",
+            xs: "flex-start",
             sm: "center",
           },
         }}
@@ -326,68 +909,397 @@ export default function WeightPage() {
             variant="h4"
             sx={{
               fontWeight: 800,
-              letterSpacing: "-0.03em",
+              letterSpacing: "-0.02em",
             }}
           >
             Weight
           </Typography>
 
           <Typography
-            variant="body1"
             color="text.secondary"
             sx={{
               mt: 0.5,
             }}
           >
-            Track your progress and stay
-            focused on your goal.
+            Track your weight and progress
+            toward your goal.
           </Typography>
         </Box>
 
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() =>
-            setShowForm((value) => !value)
-          }
+          onClick={openAddWeightDialog}
           sx={{
-            minHeight: 46,
-            borderRadius: 3,
-            fontWeight: 700,
+            borderRadius: 2,
             px: 2.5,
-            boxShadow:
-              "0 8px 24px rgba(33,150,243,0.20)",
+            py: 1.2,
+            fontWeight: 700,
           }}
         >
-          {showForm
-            ? "Close"
-            : "Add Weight"}
+          Add Weight
         </Button>
       </Stack>
 
-      {/* ADD / EDIT FORM */}
-      {showForm && (
-        <Card
-          elevation={0}
+      {/* =====================================================
+          ALERTS
+      ===================================================== */}
+
+      {error && (
+        <Alert
+          severity="error"
           sx={{
-            mb: 4,
-            borderRadius: 4,
-            border: "1px solid",
-            borderColor:
-              "rgba(33,150,243,0.18)",
-            background:
-              "linear-gradient(145deg, rgba(33,150,243,0.07), transparent)",
+            mb: 3,
+            borderRadius: 2,
+          }}
+          onClose={() =>
+            setError(null)
+          }
+        >
+          {error}
+        </Alert>
+      )}
+
+      {success && (
+        <Alert
+          severity="success"
+          sx={{
+            mb: 3,
+            borderRadius: 2,
+          }}
+          onClose={() =>
+            setSuccess(null)
+          }
+        >
+          {success}
+        </Alert>
+      )}
+
+      {/* =====================================================
+          SUMMARY CARDS
+      ===================================================== */}
+
+      <Grid
+        container
+        spacing={2}
+        sx={{
+          mb: 3,
+        }}
+      >
+        {/* CURRENT */}
+
+        <Grid
+          size={{
+            xs: 12,
+            sm: 6,
+            md: 3,
           }}
         >
-          <CardContent
+          <Card
+            elevation={0}
             sx={{
-              p: {
-                xs: 2,
-                sm: 3,
-              },
+              height: "100%",
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 3,
             }}
           >
-            <Stack spacing={3}>
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack
+                  direction="row"
+                  sx={{
+                    justifyContent:
+                      "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography
+                    color="text.secondary"
+                    sx={{
+                      fontWeight: 600,
+                    }}
+                  >
+                    Current Weight
+                  </Typography>
+
+                  <MonitorWeightIcon color="primary" />
+                </Stack>
+
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 800,
+                  }}
+                >
+                  {currentWeight !== null
+                    ? `${currentWeight} kg`
+                    : "--"}
+                </Typography>
+
+                {stats?.latest_recorded_at && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    Last recorded{" "}
+                    {formatDate(
+                      stats.latest_recorded_at
+                    )}
+                  </Typography>
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* STARTING */}
+
+        <Grid
+          size={{
+            xs: 12,
+            sm: 6,
+            md: 3,
+          }}
+        >
+          <Card
+            elevation={0}
+            sx={{
+              height: "100%",
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 3,
+            }}
+          >
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography
+                  color="text.secondary"
+                  sx={{
+                    fontWeight: 600,
+                  }}
+                >
+                  Starting Weight
+                </Typography>
+
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 800,
+                  }}
+                >
+                  {startingWeight !== null
+                    ? `${startingWeight} kg`
+                    : "--"}
+                </Typography>
+
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  {stats?.entries ?? 0}{" "}
+                  recorded{" "}
+                  {stats?.entries === 1
+                    ? "entry"
+                    : "entries"}
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* CHANGE */}
+
+        <Grid
+          size={{
+            xs: 12,
+            sm: 6,
+            md: 3,
+          }}
+        >
+          <Card
+            elevation={0}
+            sx={{
+              height: "100%",
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 3,
+            }}
+          >
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack
+                  direction="row"
+                  sx={{
+                    justifyContent:
+                      "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography
+                    color="text.secondary"
+                    sx={{
+                      fontWeight: 600,
+                    }}
+                  >
+                    Weight Change
+                  </Typography>
+
+                  {trendIsDown ? (
+                    <TrendingDownIcon color="success" />
+                  ) : trendIsUp ? (
+                    <TrendingUpIcon color="error" />
+                  ) : (
+                    <MonitorWeightIcon color="disabled" />
+                  )}
+                </Stack>
+
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 800,
+                    color: trendIsDown
+                      ? "success.main"
+                      : trendIsUp
+                      ? "error.main"
+                      : "text.primary",
+                  }}
+                >
+                  {weightChange > 0
+                    ? "+"
+                    : ""}
+                  {weightChange.toFixed(1)} kg
+                </Typography>
+
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  Since your first entry
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* TARGET */}
+
+        <Grid
+          size={{
+            xs: 12,
+            sm: 6,
+            md: 3,
+          }}
+        >
+          <Card
+            elevation={0}
+            sx={{
+              height: "100%",
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 3,
+            }}
+          >
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack
+                  direction="row"
+                  sx={{
+                    justifyContent:
+                      "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography
+                    color="text.secondary"
+                    sx={{
+                      fontWeight: 600,
+                    }}
+                  >
+                    Target Weight
+                  </Typography>
+
+                  <IconButton
+                    size="small"
+                    onClick={
+                      openTargetDialog
+                    }
+                    aria-label="Edit target weight"
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 800,
+                  }}
+                >
+                  {actualTargetWeight !== null
+                    ? `${actualTargetWeight} kg`
+                    : "--"}
+                </Typography>
+
+                <Button
+                  size="small"
+                  variant="text"
+                  startIcon={<FlagIcon />}
+                  onClick={
+                    openTargetDialog
+                  }
+                  sx={{
+                    alignSelf:
+                      "flex-start",
+                    px: 0,
+                    minWidth: 0,
+                  }}
+                >
+                  Edit target
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* =====================================================
+          GOAL PROGRESS
+      ===================================================== */}
+
+      <Card
+        elevation={0}
+        sx={{
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 3,
+          mb: 3,
+        }}
+      >
+        <CardContent
+          sx={{
+            p: {
+              xs: 2,
+              md: 3,
+            },
+          }}
+        >
+          <Stack spacing={2.5}>
+            <Stack
+              direction={{
+                xs: "column",
+                sm: "row",
+              }}
+              sx={{
+                justifyContent:
+                  "space-between",
+                alignItems: {
+                  xs: "flex-start",
+                  sm: "center",
+                },
+              }}
+              spacing={1}
+            >
               <Box>
                 <Typography
                   variant="h6"
@@ -395,9 +1307,7 @@ export default function WeightPage() {
                     fontWeight: 800,
                   }}
                 >
-                  {editingId
-                    ? "Edit Weight"
-                    : "Record Weight"}
+                  Goal Progress
                 </Typography>
 
                 <Typography
@@ -407,643 +1317,271 @@ export default function WeightPage() {
                     mt: 0.5,
                   }}
                 >
-                  Enter your measurement below.
+                  {actualTargetWeight !== null
+                    ? `Target: ${actualTargetWeight} kg`
+                    : "Set a target weight to track your goal."}
                 </Typography>
               </Box>
 
-              <Box
+              <Chip
+                label={`${progress.toFixed(0)}%`}
+                color="primary"
                 sx={{
-                  display: "grid",
-                  gridTemplateColumns: {
-                    xs: "1fr",
-                    sm: "repeat(2, 1fr)",
-                  },
-                  gap: 2,
+                  fontWeight: 800,
                 }}
-              >
-                <TextField
-                  label="Weight"
-                  type="number"
-                  value={form.weight_kg}
-                  onChange={(e) =>
-                    setForm((current) => ({
-                      ...current,
-                      weight_kg:
-                        e.target.value,
-                    }))
-                  }
-                  fullWidth
-                  required
-                  placeholder="e.g. 82.5"
-                  slotProps={{
-                    htmlInput: {
-                      min: 1,
-                      max: 500,
-                      step: 0.1,
-                    },
-                  }}
-                />
-
-                <TextField
-                  label="Recorded At"
-                  type="datetime-local"
-                  value={form.recorded_at}
-                  onChange={(e) =>
-                    setForm((current) => ({
-                      ...current,
-                      recorded_at:
-                        e.target.value,
-                    }))
-                  }
-                  fullWidth
-                  required
-                  slotProps={{
-                    inputLabel: {
-                      shrink: true,
-                    },
-                  }}
-                />
-              </Box>
-
-              <TextField
-                label="Notes"
-                value={form.notes}
-                onChange={(e) =>
-                  setForm((current) => ({
-                    ...current,
-                    notes: e.target.value,
-                  }))
-                }
-                fullWidth
-                multiline
-                minRows={3}
-                placeholder="Optional notes..."
               />
-
-              <Stack
-                sx={{
-                  gap: 1.5,
-                  flexDirection: {
-                    xs: "column",
-                    sm: "row",
-                  },
-                }}
-              >
-                <Button
-                  variant="contained"
-                  onClick={handleSubmit}
-                  disabled={saving}
-                  startIcon={
-                    saving ? (
-                      <CircularProgress
-                        size={18}
-                        color="inherit"
-                      />
-                    ) : (
-                      <ScaleIcon />
-                    )
-                  }
-                  sx={{
-                    minHeight: 46,
-                    borderRadius: 3,
-                    fontWeight: 700,
-                  }}
-                >
-                  {saving
-                    ? "Saving..."
-                    : editingId
-                    ? "Update Weight"
-                    : "Save Weight"}
-                </Button>
-
-                <Button
-                  variant="outlined"
-                  onClick={resetForm}
-                  disabled={saving}
-                  sx={{
-                    minHeight: 46,
-                    borderRadius: 3,
-                  }}
-                >
-                  Cancel
-                </Button>
-              </Stack>
             </Stack>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* LOADING */}
-      {loading && (
-        <Box
-          sx={{
-            py: 12,
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <CircularProgress />
-        </Box>
-      )}
-
-      {/* NO DATA */}
-      {!loading && !hasData && (
-        <Card
-          elevation={0}
-          sx={{
-            borderRadius: 5,
-            border: "1px solid",
-            borderColor: "divider",
-            textAlign: "center",
-            py: {
-              xs: 7,
-              sm: 10,
-            },
-            px: 3,
-          }}
-        >
-          <Stack
-            sx={{
-              alignItems: "center",
-              gap: 2,
-            }}
-          >
-            <Box
+            <LinearProgress
+              variant="determinate"
+              value={progress}
               sx={{
-                width: 72,
-                height: 72,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                bgcolor:
-                  "rgba(33,150,243,0.10)",
-                color: "primary.main",
+                height: 10,
+                borderRadius: 10,
+              }}
+            />
+
+            <Stack
+              direction={{
+                xs: "column",
+                sm: "row",
+              }}
+              spacing={1}
+              sx={{
+                justifyContent:
+                  "space-between",
               }}
             >
-              <ScaleIcon
-                sx={{
-                  fontSize: 36,
-                }}
-              />
-            </Box>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
+                Current:{" "}
+                <strong>
+                  {currentWeight !== null
+                    ? `${currentWeight} kg`
+                    : "--"}
+                </strong>
+              </Typography>
 
-            <Typography
-              variant="h5"
-              sx={{
-                fontWeight: 800,
-              }}
-            >
-              Start tracking your weight
-            </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
+                Remaining:{" "}
+                <strong>
+                  {remainingToGoal !== null
+                    ? `${remainingToGoal.toFixed(
+                        1
+                      )} kg`
+                    : "--"}
+                </strong>
+              </Typography>
 
-            <Typography
-              variant="body1"
-              color="text.secondary"
-              sx={{
-                maxWidth: 500,
-                lineHeight: 1.7,
-              }}
-            >
-              You don't have any weight
-              measurements yet. Add your first
-              measurement to start seeing your
-              progress and weight trend.
-            </Typography>
-
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() =>
-                setShowForm(true)
-              }
-              sx={{
-                mt: 1,
-                borderRadius: 3,
-                px: 3,
-                minHeight: 46,
-                fontWeight: 700,
-              }}
-            >
-              Add First Weight
-            </Button>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
+                Target:{" "}
+                <strong>
+                  {actualTargetWeight !== null
+                    ? `${actualTargetWeight} kg`
+                    : "--"}
+                </strong>
+              </Typography>
+            </Stack>
           </Stack>
-        </Card>
-      )}
+        </CardContent>
+      </Card>
 
-      {/* DATA */}
-      {!loading && hasData && (
-        <>
-          {/* STAT CARDS */}
+      {/* =====================================================
+          WEIGHT HISTORY
+      ===================================================== */}
+
+      <Card
+        elevation={0}
+        sx={{
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 3,
+        }}
+      >
+        <CardContent
+          sx={{
+            p: 0,
+          }}
+        >
           <Box
             sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "repeat(2, 1fr)",
-                lg: "repeat(4, 1fr)",
+              p: {
+                xs: 2,
+                md: 3,
               },
-              gap: 2,
-              mb: 3,
             }}
           >
-            {/* CURRENT */}
-            <Card
-              elevation={0}
+            <Stack
+              direction="row"
               sx={{
-                borderRadius: 4,
-                border: "1px solid",
-                borderColor:
-                  "rgba(33,150,243,0.16)",
-                background:
-                  "linear-gradient(145deg, rgba(33,150,243,0.10), transparent)",
+                alignItems: "center",
+                justifyContent:
+                  "space-between",
               }}
             >
-              <CardContent>
-                <Stack spacing={1.5}>
-                  <Stack
-                    sx={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent:
-                        "space-between",
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                    >
-                      Current Weight
-                    </Typography>
+              <Box>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 800,
+                  }}
+                >
+                  Weight History
+                </Typography>
 
-                    <ScaleIcon
-                      sx={{
-                        color:
-                          "primary.main",
-                      }}
-                    />
-                  </Stack>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{
+                    mt: 0.5,
+                  }}
+                >
+                  Your recorded weight entries.
+                </Typography>
+              </Box>
 
-                  <Typography
-                    variant="h4"
-                    sx={{
-                      fontWeight: 800,
-                    }}
-                  >
-                    {currentWeight !==
-                    null
-                      ? `${currentWeight.toFixed(
-                          1
-                        )} kg`
-                      : "--"}
-                  </Typography>
+              <Chip
+                label={`${weights.length} ${
+                  weights.length === 1
+                    ? "entry"
+                    : "entries"
+                }`}
+                variant="outlined"
+              />
+            </Stack>
+          </Box>
 
-                  {formattedLatestDate && (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                    >
-                      Updated{" "}
-                      {formattedLatestDate}
-                    </Typography>
-                  )}
-                </Stack>
-              </CardContent>
-            </Card>
+          <Divider />
 
-            {/* CHANGE */}
-            <Card
-              elevation={0}
+          {weights.length === 0 ? (
+            <Box
               sx={{
-                borderRadius: 4,
-                border: "1px solid",
-                borderColor: "divider",
+                py: 8,
+                px: 3,
+                textAlign: "center",
               }}
             >
-              <CardContent>
-                <Stack spacing={1.5}>
-                  <Stack
-                    sx={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent:
-                        "space-between",
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                    >
-                      Weight Change
-                    </Typography>
+              <MonitorWeightIcon
+                sx={{
+                  fontSize: 48,
+                  color: "text.disabled",
+                  mb: 2,
+                }}
+              />
 
-                    {weightChange !==
-                      null &&
-                    weightChange <= 0 ? (
-                      <TrendingDownIcon
-                        sx={{
-                          color:
-                            "success.main",
-                        }}
-                      />
-                    ) : (
-                      <TrendingUpIcon
-                        sx={{
-                          color:
-                            "warning.main",
-                        }}
-                      />
-                    )}
-                  </Stack>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                }}
+              >
+                No weight entries yet
+              </Typography>
 
-                  <Typography
-                    variant="h4"
-                    sx={{
-                      fontWeight: 800,
-                    }}
-                  >
-                    {weightChange !==
-                    null
-                      ? `${
-                          weightChange > 0
-                            ? "+"
-                            : ""
-                        }${weightChange.toFixed(
-                          1
-                        )} kg`
-                      : "--"}
-                  </Typography>
+              <Typography
+                color="text.secondary"
+                sx={{
+                  mt: 0.5,
+                  mb: 3,
+                }}
+              >
+                Add your first weight
+                measurement to start tracking
+                your progress.
+              </Typography>
 
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    Since your first
-                    measurement
-                  </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-
-            {/* GOAL */}
-            <Card
-              elevation={0}
-              sx={{
-                borderRadius: 4,
-                border: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              <CardContent>
-                <Stack spacing={1.5}>
-                  <Stack
-                    sx={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent:
-                        "space-between",
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                    >
-                      Target Weight
-                    </Typography>
-
-                    <FlagIcon
-                      sx={{
-                        color:
-                          "secondary.main",
-                      }}
-                    />
-                  </Stack>
-
-                  <Typography
-                    variant="h4"
-                    sx={{
-                      fontWeight: 800,
-                    }}
-                  >
-                    {targetWeight !==
-                    null
-                      ? `${targetWeight.toFixed(
-                          1
-                        )} kg`
-                      : "--"}
-                  </Typography>
-
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    Your goal
-                  </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-
-            {/* REMAINING */}
-            <Card
-              elevation={0}
-              sx={{
-                borderRadius: 4,
-                border: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              <CardContent>
-                <Stack spacing={1.5}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
-                    Remaining to Goal
-                  </Typography>
-
-                  <Typography
-                    variant="h4"
-                    sx={{
-                      fontWeight: 800,
-                    }}
-                  >
-                    {remainingToGoal !==
-                    null
-                      ? `${Math.abs(
-                          remainingToGoal
-                        ).toFixed(
-                          1
-                        )} kg`
-                      : "--"}
-                  </Typography>
-
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={
+                  openAddWeightDialog
+                }
+              >
+                Add Weight
+              </Button>
+            </Box>
+          ) : (
+            <Box>
+              {weights.map(
+                (
+                  weight,
+                  index
+                ) => (
                   <Box
-                    sx={{
-                      height: 6,
-                      borderRadius: 10,
-                      bgcolor:
-                        "action.hover",
-                      overflow: "hidden",
-                    }}
+                    key={weight.id}
                   >
                     <Box
                       sx={{
-                        width: `${progress}%`,
-                        height: "100%",
-                        borderRadius: 10,
-                        bgcolor:
-                          "primary.main",
+                        px: {
+                          xs: 2,
+                          md: 3,
+                        },
+                        py: 2,
+                        display: "flex",
+                        alignItems:
+                          "center",
+                        justifyContent:
+                          "space-between",
+                        gap: 2,
                         transition:
-                          "width 0.6s ease",
-                      }}
-                    />
-                  </Box>
-
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    {progress.toFixed(0)}%
-                    goal progress
-                  </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Box>
-
-          {/* CHART */}
-          <Box sx={{ mb: 3 }}>
-            <WeightChart
-              weights={weights}
-            />
-          </Box>
-
-          {/* HISTORY */}
-          <Card
-            elevation={0}
-            sx={{
-              borderRadius: 4,
-              border: "1px solid",
-              borderColor: "divider",
-            }}
-          >
-            <CardContent
-              sx={{
-                p: {
-                  xs: 2,
-                  sm: 3,
-                },
-              }}
-            >
-              <Stack spacing={3}>
-                {/* HISTORY HEADER */}
-                <Stack
-                  sx={{
-                    gap: 2,
-                    flexDirection: {
-                      xs: "column",
-                      sm: "row",
-                    },
-                    justifyContent:
-                      "space-between",
-                    alignItems: {
-                      xs: "stretch",
-                      sm: "center",
-                    },
-                  }}
-                >
-                  <Box>
-                    <Typography
-                      variant="h6"
-                      sx={{
-                        fontWeight: 800,
+                          "background-color 0.2s",
+                        "&:hover": {
+                          backgroundColor:
+                            "action.hover",
+                        },
                       }}
                     >
-                      Weight History
-                    </Typography>
-
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                    >
-                      Your recorded
-                      measurements
-                    </Typography>
-                  </Box>
-
-                  <TextField
-                    select
-                    label="Sort"
-                    value={sort}
-                    onChange={(e) => {
-                      setSort(
-                        e.target.value as
-                          | "asc"
-                          | "desc"
-                      );
-                      setPage(1);
-                    }}
-                    size="small"
-                    sx={{
-                      minWidth: 150,
-                    }}
-                  >
-                    <MenuItem value="desc">
-                      Newest first
-                    </MenuItem>
-
-                    <MenuItem value="asc">
-                      Oldest first
-                    </MenuItem>
-                  </TextField>
-                </Stack>
-
-                <Divider />
-
-                {/* ENTRIES */}
-                <Stack spacing={1}>
-                  {weights.map(
-                    (weight) => (
-                      <Box
-                        key={weight.id}
+                      <Stack
+                        direction="row"
+                        spacing={2}
                         sx={{
-                          display: "flex",
+                          minWidth: 0,
                           alignItems:
                             "center",
-                          justifyContent:
-                            "space-between",
-                          gap: 2,
-                          p: {
-                            xs: 1.5,
-                            sm: 2,
-                          },
-                          borderRadius: 3,
-                          transition:
-                            "background-color 0.2s ease",
-                          "&:hover": {
-                            bgcolor:
-                              "action.hover",
-                          },
                         }}
                       >
-                        <Stack
+                        <Box
+                          sx={{
+                            width: 44,
+                            height: 44,
+                            borderRadius:
+                              "50%",
+                            display:
+                              "flex",
+                            alignItems:
+                              "center",
+                            justifyContent:
+                              "center",
+                            backgroundColor:
+                              "action.selected",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <MonitorWeightIcon color="primary" />
+                        </Box>
+
+                        <Box
                           sx={{
                             minWidth: 0,
-                            gap: 0.5,
                           }}
                         >
                           <Typography
+                            variant="body1"
                             sx={{
                               fontWeight: 800,
-                              fontSize:
-                                "1.05rem",
                             }}
                           >
-                            {Number(
+                            {
                               weight.weight_kg
-                            ).toFixed(
-                              1
-                            )}{" "}
+                            }{" "}
                             kg
                           </Typography>
 
@@ -1051,17 +1589,8 @@ export default function WeightPage() {
                             variant="body2"
                             color="text.secondary"
                           >
-                            {new Date(
+                            {formatDate(
                               weight.recorded_at
-                            ).toLocaleString(
-                              "en-IN",
-                              {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                                hour: "numeric",
-                                minute: "2-digit",
-                              }
                             )}
                           </Typography>
 
@@ -1071,152 +1600,404 @@ export default function WeightPage() {
                               color="text.secondary"
                               sx={{
                                 mt: 0.5,
+                                overflow:
+                                  "hidden",
+                                textOverflow:
+                                  "ellipsis",
+                                whiteSpace:
+                                  "nowrap",
+                                maxWidth: {
+                                  xs: 150,
+                                  sm: 350,
+                                  md: 500,
+                                },
                               }}
                             >
-                              {weight.notes}
+                              {
+                                weight.notes
+                              }
                             </Typography>
                           )}
-                        </Stack>
+                        </Box>
+                      </Stack>
 
-                        <Stack
-                          sx={{
-                            flexDirection:
-                              "row",
-                            alignItems:
-                              "center",
-                            flexShrink: 0,
-                          }}
+                      <Stack
+                        direction="row"
+                        spacing={0.5}
+                        sx={{
+                          flexShrink: 0,
+                        }}
+                      >
+                        <IconButton
+                          onClick={() =>
+                            openEditWeightDialog(
+                              weight
+                            )
+                          }
+                          aria-label="Edit weight"
                         >
-                          <IconButton
-                            aria-label="Edit weight"
-                            onClick={() =>
-                              handleEdit(
-                                weight
-                              )
-                            }
-                            disabled={
-                              deletingId !==
-                              null
-                            }
-                            sx={{
-                              color:
-                                "primary.main",
-                            }}
-                          >
-                            <EditIcon />
-                          </IconButton>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
 
-                          <IconButton
-                            aria-label="Delete weight"
-                            onClick={() =>
-                              handleDelete(
-                                weight.id
-                              )
-                            }
-                            disabled={
-                              deletingId ===
-                              weight.id
-                            }
-                            sx={{
-                              color:
-                                "error.main",
-                            }}
-                          >
-                            {deletingId ===
-                            weight.id ? (
-                              <CircularProgress
-                                size={20}
-                                color="inherit"
-                              />
-                            ) : (
-                              <DeleteIcon />
-                            )}
-                          </IconButton>
-                        </Stack>
-                      </Box>
-                    )
-                  )}
-                </Stack>
+                        <IconButton
+                          color="error"
+                          onClick={() =>
+                            deleteWeight(
+                              weight
+                            )
+                          }
+                          aria-label="Delete weight"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
+                    </Box>
 
-                {/* PAGINATION */}
-                <Stack
-                  sx={{
-                    gap: 2,
-                    flexDirection: {
-                      xs: "column",
-                      sm: "row",
-                    },
-                    alignItems: {
-                      xs: "stretch",
-                      sm: "center",
-                    },
-                    justifyContent:
-                      "space-between",
-                  }}
-                >
-                  <TextField
-                    select
-                    size="small"
-                    label="Entries per page"
-                    value={limit}
-                    onChange={(e) => {
-                      setLimit(
-                        Number(
-                          e.target.value
-                        )
-                      );
-                      setPage(1);
-                    }}
-                    sx={{
-                      width: {
-                        xs: "100%",
-                        sm: 170,
-                      },
-                    }}
-                  >
-                    <MenuItem value={5}>
-                      5
-                    </MenuItem>
+                    {index <
+                      weights.length -
+                        1 && (
+                      <Divider />
+                    )}
+                  </Box>
+                )
+              )}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
 
-                    <MenuItem value={10}>
-                      10
-                    </MenuItem>
+      {/* =====================================================
+          ADD / EDIT WEIGHT DIALOG
+      ===================================================== */}
 
-                    <MenuItem value={25}>
-                      25
-                    </MenuItem>
+      <Dialog
+        open={weightDialogOpen}
+        onClose={closeWeightDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent:
+                "space-between",
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 800,
+              }}
+            >
+              {editingWeight
+                ? "Edit Weight"
+                : "Add Weight"}
+            </Typography>
 
-                    <MenuItem value={50}>
-                      50
-                    </MenuItem>
+            <IconButton
+              onClick={
+                closeWeightDialog
+              }
+              disabled={saving}
+              aria-label="Close"
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
 
-                    <MenuItem value={100}>
-                      100
-                    </MenuItem>
-                  </TextField>
+        <DialogContent>
+          <Stack
+            spacing={2.5}
+            sx={{
+              pt: 1,
+            }}
+          >
+            <TextField
+              label="Weight"
+              type="number"
+              value={form.weight_kg}
+              onChange={(event) =>
+                setForm(
+                  (
+                    previous
+                  ) => ({
+                    ...previous,
+                    weight_kg:
+                      event.target
+                        .value,
+                  })
+                )
+              }
+              fullWidth
+              required
+              slotProps={{
+                htmlInput: {
+                  min: 0,
+                  step: 0.1,
+                },
+                input: {
+                  endAdornment: (
+                    <Typography
+                      color="text.secondary"
+                      sx={{
+                        ml: 1,
+                      }}
+                    >
+                      kg
+                    </Typography>
+                  ),
+                },
+              }}
+            />
 
-                  {totalPages > 1 && (
-                    <Pagination
-                      page={page}
-                      count={totalPages}
-                      onChange={(
-                        _event,
-                        value
-                      ) =>
-                        setPage(value)
-                      }
-                      color="primary"
-                      shape="rounded"
-                      siblingCount={1}
-                      boundaryCount={1}
-                    />
-                  )}
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-        </>
-      )}
+            <TextField
+              label="Date"
+              type="date"
+              value={
+                form.recorded_at
+              }
+              onChange={(event) =>
+                setForm(
+                  (
+                    previous
+                  ) => ({
+                    ...previous,
+                    recorded_at:
+                      event.target
+                        .value,
+                  })
+                )
+              }
+              fullWidth
+              required
+              slotProps={{
+                inputLabel: {
+                  shrink: true,
+                },
+              }}
+            />
+
+            <TextField
+              label="Notes"
+              value={form.notes}
+              onChange={(event) =>
+                setForm(
+                  (
+                    previous
+                  ) => ({
+                    ...previous,
+                    notes:
+                      event.target
+                        .value,
+                  })
+                )
+              }
+              fullWidth
+              multiline
+              minRows={3}
+              placeholder="Optional notes..."
+            />
+
+            <Typography
+              variant="caption"
+              color="text.secondary"
+            >
+              Date is saved as YYYY-MM-DD.
+            </Typography>
+          </Stack>
+        </DialogContent>
+
+        <DialogActions
+          sx={{
+            px: 3,
+            pb: 2.5,
+          }}
+        >
+          <Button
+            onClick={
+              closeWeightDialog
+            }
+            disabled={saving}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={
+              saveWeight
+            }
+            disabled={saving}
+            startIcon={
+              saving ? (
+                <CircularProgress
+                  size={18}
+                />
+              ) : editingWeight ? (
+                <EditIcon />
+              ) : (
+                <AddIcon />
+              )
+            }
+          >
+            {saving
+              ? "Saving..."
+              : editingWeight
+              ? "Update Weight"
+              : "Save Weight"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* =====================================================
+          TARGET WEIGHT DIALOG
+      ===================================================== */}
+
+      <Dialog
+        open={targetDialogOpen}
+        onClose={
+          closeTargetDialog
+        }
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent:
+                "space-between",
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 800,
+              }}
+            >
+              Target Weight
+            </Typography>
+
+            <IconButton
+              onClick={
+                closeTargetDialog
+              }
+              disabled={
+                savingTarget
+              }
+              aria-label="Close"
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent>
+          <Stack
+            spacing={2}
+            sx={{
+              pt: 1,
+            }}
+          >
+            <Typography
+              variant="body2"
+              color="text.secondary"
+            >
+              Set the weight you want to
+              reach. This value is stored in
+              your profile and is used to
+              calculate your weight progress.
+            </Typography>
+
+            <TextField
+              label="Target weight"
+              type="number"
+              value={
+                targetInput
+              }
+              onChange={(event) =>
+                setTargetInput(
+                  event.target
+                    .value
+                )
+              }
+              fullWidth
+              autoFocus
+              slotProps={{
+                htmlInput: {
+                  min: 0,
+                  step: 0.1,
+                },
+                input: {
+                  endAdornment: (
+                    <Typography
+                      color="text.secondary"
+                      sx={{
+                        ml: 1,
+                      }}
+                    >
+                      kg
+                    </Typography>
+                  ),
+                },
+              }}
+              onKeyDown={(event) => {
+                if (
+                  event.key ===
+                  "Enter"
+                ) {
+                  saveTargetWeight();
+                }
+              }}
+            />
+          </Stack>
+        </DialogContent>
+
+        <DialogActions
+          sx={{
+            px: 3,
+            pb: 2.5,
+          }}
+        >
+          <Button
+            onClick={
+              closeTargetDialog
+            }
+            disabled={
+              savingTarget
+            }
+          >
+            Cancel
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={
+              saveTargetWeight
+            }
+            disabled={
+              savingTarget
+            }
+            startIcon={
+              savingTarget ? (
+                <CircularProgress
+                  size={18}
+                />
+              ) : (
+                <FlagIcon />
+              )
+            }
+          >
+            {savingTarget
+              ? "Saving..."
+              : "Save Target"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

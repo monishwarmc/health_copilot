@@ -1,31 +1,7 @@
 import api from "@/lib/api";
 
-export interface Weight {
-  id: string;
-  weight_kg: number;
-  notes: string | null;
-  recorded_at: string;
-  created_at: string;
-}
+import {Weight, WeightStats, WeightListResponse} from "@/types/weight"
 
-export interface WeightListResponse {
-  items: Weight[];
-  total: number;
-  page: number;
-  limit: number;
-  pages: number;
-}
-
-export interface WeightStats {
-  current_weight: number;
-  starting_weight: number;
-  target_weight: number;
-  weight_change: number;
-  remaining_to_goal: number;
-  goal_progress_percent: number;
-  entries: number;
-  latest_recorded_at: string;
-}
 
 export interface CreateWeightData {
   weight_kg: number;

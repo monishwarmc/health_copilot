@@ -21,7 +21,8 @@ import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 
 import { useAuth } from "@/context/AuthContext";
-import { getWeightStats, WeightStats } from "@/services/weight.service";
+import { getWeightStats } from "@/services/weight.service";
+import { WeightStats } from "@/types/weight";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -80,9 +81,11 @@ export default function DashboardPage() {
       }}
     >
       <Stack spacing={{ xs: 2.5, sm: 3.5 }}>
+
         {/* =========================================================
             HERO
         ========================================================= */}
+
         <Box
           sx={{
             position: "relative",
@@ -103,7 +106,6 @@ export default function DashboardPage() {
               "rgba(33,150,243,0.15)",
           }}
         >
-          {/* Glow */}
           <Box
             sx={{
               position: "absolute",
@@ -182,6 +184,7 @@ export default function DashboardPage() {
         {/* =========================================================
             QUICK ACTIONS
         ========================================================= */}
+
         <Grid
           container
           spacing={{
@@ -189,7 +192,11 @@ export default function DashboardPage() {
             sm: 2,
           }}
         >
-          {/* Nutrition */}
+
+          {/* =====================================================
+              NUTRITION
+          ===================================================== */}
+
           <Grid
             size={{
               xs: 12,
@@ -206,8 +213,7 @@ export default function DashboardPage() {
                 transition:
                   "transform 0.25s ease, box-shadow 0.25s ease",
                 "&:hover": {
-                  transform:
-                    "translateY(-3px)",
+                  transform: "translateY(-3px)",
                   boxShadow:
                     "0 12px 30px rgba(0,0,0,0.08)",
                 },
@@ -228,6 +234,7 @@ export default function DashboardPage() {
                 }}
               >
                 <Stack spacing={1.5}>
+
                   <Box
                     sx={{
                       width: 44,
@@ -257,12 +264,12 @@ export default function DashboardPage() {
                     variant="body2"
                     color="text.secondary"
                   >
-                    Nutrition tracking is coming
-                    soon.
+                    Track your meals, calories,
+                    nutrition and daily food intake.
                   </Typography>
 
                   <Button
-                    disabled
+                    href="/nutrition"
                     endIcon={
                       <ArrowForwardRoundedIcon />
                     }
@@ -272,14 +279,18 @@ export default function DashboardPage() {
                       fontWeight: 700,
                     }}
                   >
-                    Coming soon
+                    Open Nutrition
                   </Button>
+
                 </Stack>
               </CardContent>
             </Card>
           </Grid>
 
-          {/* Workout */}
+          {/* =====================================================
+              WORKOUT
+          ===================================================== */}
+
           <Grid
             size={{
               xs: 12,
@@ -296,8 +307,7 @@ export default function DashboardPage() {
                 transition:
                   "transform 0.25s ease, box-shadow 0.25s ease",
                 "&:hover": {
-                  transform:
-                    "translateY(-3px)",
+                  transform: "translateY(-3px)",
                   boxShadow:
                     "0 12px 30px rgba(0,0,0,0.08)",
                 },
@@ -318,6 +328,7 @@ export default function DashboardPage() {
                 }}
               >
                 <Stack spacing={1.5}>
+
                   <Box
                     sx={{
                       width: 44,
@@ -364,12 +375,16 @@ export default function DashboardPage() {
                   >
                     Coming soon
                   </Button>
+
                 </Stack>
               </CardContent>
             </Card>
           </Grid>
 
-          {/* AI Chat */}
+          {/* =====================================================
+              AI CHAT
+          ===================================================== */}
+
           <Grid
             size={{
               xs: 12,
@@ -386,8 +401,7 @@ export default function DashboardPage() {
                 transition:
                   "transform 0.25s ease, box-shadow 0.25s ease",
                 "&:hover": {
-                  transform:
-                    "translateY(-3px)",
+                  transform: "translateY(-3px)",
                   boxShadow:
                     "0 12px 30px rgba(0,0,0,0.08)",
                 },
@@ -408,6 +422,7 @@ export default function DashboardPage() {
                 }}
               >
                 <Stack spacing={1.5}>
+
                   <Box
                     sx={{
                       width: 44,
@@ -454,15 +469,18 @@ export default function DashboardPage() {
                   >
                     Open Chat
                   </Button>
+
                 </Stack>
               </CardContent>
             </Card>
           </Grid>
+
         </Grid>
 
         {/* =========================================================
             WEIGHT PROGRESS
         ========================================================= */}
+
         <Card
           elevation={0}
           sx={{
@@ -476,7 +494,7 @@ export default function DashboardPage() {
             position: "relative",
           }}
         >
-          {/* Background glow */}
+
           <Box
             sx={{
               position: "absolute",
@@ -510,8 +528,11 @@ export default function DashboardPage() {
               },
             }}
           >
+
             <Stack spacing={3}>
+
               {/* Header */}
+
               <Stack
                 direction={{
                   xs: "column",
@@ -526,7 +547,9 @@ export default function DashboardPage() {
                   },
                 }}
               >
+
                 <Box>
+
                   <Stack
                     direction="row"
                     spacing={1}
@@ -560,6 +583,7 @@ export default function DashboardPage() {
                     Track your journey toward your
                     goal.
                   </Typography>
+
                 </Box>
 
                 <Button
@@ -576,9 +600,11 @@ export default function DashboardPage() {
                 >
                   Weight
                 </Button>
+
               </Stack>
 
               {/* Loading */}
+
               {loadingStats ? (
                 <Box
                   sx={{
@@ -588,14 +614,14 @@ export default function DashboardPage() {
                     justifyContent: "center",
                   }}
                 >
-                  <CircularProgress
-                    size={32}
-                  />
+                  <CircularProgress size={32} />
                 </Box>
               ) : !hasWeightData ? (
+
                 /* =================================================
                    EMPTY STATE
                 ================================================= */
+
                 <Box
                   sx={{
                     minHeight: {
@@ -611,6 +637,7 @@ export default function DashboardPage() {
                     bgcolor: "action.hover",
                   }}
                 >
+
                   <Stack
                     spacing={1.5}
                     sx={{
@@ -618,6 +645,7 @@ export default function DashboardPage() {
                       maxWidth: 500,
                     }}
                   >
+
                     <Box
                       sx={{
                         width: 64,
@@ -673,19 +701,27 @@ export default function DashboardPage() {
                     >
                       Add Weight
                     </Button>
+
                   </Stack>
                 </Box>
+
               ) : (
+
                 /* =================================================
                    WEIGHT DATA
                 ================================================= */
+
                 <Stack spacing={3}>
+
                   {/* Stats */}
+
                   <Grid
                     container
                     spacing={1.5}
                   >
+
                     {/* Current */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -722,6 +758,7 @@ export default function DashboardPage() {
                                 1
                               )
                             : "--"}
+
                           <Typography
                             component="span"
                             sx={{
@@ -742,6 +779,7 @@ export default function DashboardPage() {
                     </Grid>
 
                     {/* Starting */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -778,6 +816,7 @@ export default function DashboardPage() {
                                 1
                               )
                             : "--"}
+
                           <Typography
                             component="span"
                             sx={{
@@ -798,6 +837,7 @@ export default function DashboardPage() {
                     </Grid>
 
                     {/* Goal */}
+
                     <Grid
                       size={{
                         xs: 12,
@@ -834,6 +874,7 @@ export default function DashboardPage() {
                                 1
                               )
                             : "--"}
+
                           <Typography
                             component="span"
                             sx={{
@@ -852,12 +893,15 @@ export default function DashboardPage() {
                         </Typography>
                       </Box>
                     </Grid>
+
                   </Grid>
 
                   {/* Progress */}
+
                   {stats?.goal_progress_percent !=
                     null && (
                     <Box>
+
                       <Stack
                         direction="row"
                         sx={{
@@ -867,6 +911,7 @@ export default function DashboardPage() {
                           mb: 1,
                         }}
                       >
+
                         <Typography
                           variant="body2"
                           color="text.secondary"
@@ -884,6 +929,7 @@ export default function DashboardPage() {
                         >
                           {progress.toFixed(0)}%
                         </Typography>
+
                       </Stack>
 
                       <LinearProgress
@@ -902,10 +948,12 @@ export default function DashboardPage() {
                             },
                         }}
                       />
+
                     </Box>
                   )}
 
                   {/* Change */}
+
                   {stats?.weight_change != null && (
                     <Box
                       sx={{
@@ -917,6 +965,7 @@ export default function DashboardPage() {
                             : "rgba(255,152,0,0.08)",
                       }}
                     >
+
                       <Typography
                         variant="body2"
                         color="text.secondary"
@@ -939,13 +988,18 @@ export default function DashboardPage() {
                         )}{" "}
                         kg
                       </Typography>
+
                     </Box>
                   )}
+
                 </Stack>
               )}
+
             </Stack>
+
           </CardContent>
         </Card>
+
       </Stack>
     </Box>
   );
