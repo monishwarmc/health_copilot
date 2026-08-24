@@ -1,5 +1,5 @@
 from app.providers.embedding import (
-    generate_embedding,
+    get_embedding,
 )
 
 from app.rag.chroma import collection
@@ -10,7 +10,7 @@ def retrieve(
     n_results: int = 5,
 ):
 
-    embedding = generate_embedding(
+    embedding = get_embedding(
         query
     )
 
