@@ -52,5 +52,5 @@ watchfiles==1.2.0
 websockets==16.1.1
 pymupdf==1.28.2
 chromadb==1.5.9
-
+sentence-transformers
 
