@@ -1,4 +1,4 @@
-import httpx
+import requests
 
 from app.core.config import settings
 
@@ -7,80 +7,115 @@ MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 HF_URL = (
     "https://router.huggingface.co/"
-    "hf-inference/models/"
-    f"{MODEL_NAME}/pipeline/feature-extraction"
+    f"hf-inference/models/{MODEL_NAME}/pipeline/feature-extraction"
 )
 
 
-def generate_embedding(text: str) -> list[float]:
+def get_embedding(text: str) -> list[float]:
 
-    if not text.strip():
-        raise ValueError(
-            "Cannot generate embedding for empty text."
-        )
+    if not text or not text.strip():
+        raise ValueError("Cannot create embedding from empty text.")
 
     headers = {
-        "Authorization": (
-            f"Bearer {settings.HF_TOKEN}"
-        ),
+        "Authorization": f"Bearer {settings.HF_TOKEN}",
         "Content-Type": "application/json",
     }
 
     payload = {
         "inputs": text,
+        "normalize": True,
     }
 
-    response = httpx.post(
+    response = requests.post(
         HF_URL,
         headers=headers,
         json=payload,
-        timeout=60.0,
+        timeout=30,
     )
 
     response.raise_for_status()
 
-    embedding = response.json()
+    data = response.json()
 
-    # Hugging Face may return a token-level
-    # feature matrix. Convert it to a sentence
-    # embedding using mean pooling.
+    # --------------------------------------------------------
+    # HF feature-extraction returns token embeddings:
+    #
+    # [
+    #     [
+    #         [384 values],   # token 1
+    #         [384 values],   # token 2
+    #         ...
+    #     ]
+    # ]
+    #
+    # We need one 384-dimensional sentence embedding.
+    # --------------------------------------------------------
 
-    if (
-        isinstance(embedding, list)
-        and embedding
-        and isinstance(embedding[0], list)
-    ):
+    if not isinstance(data, list):
+        raise ValueError(
+            f"Unexpected embedding response from Hugging Face: "
+            f"{type(data).__name__}"
+        )
 
-        # Already sentence-level vector
-        if isinstance(
-            embedding[0][0],
-            (int, float),
-        ):
+    if not data:
+        raise ValueError(
+            "Hugging Face returned an empty embedding response."
+        )
 
-            # Determine whether this is:
-            # [384]
-            # or
-            # [tokens][384]
+    # Single sentence:
+    #
+    # data = [
+    #     [token_embedding, token_embedding, ...]
+    # ]
+    #
+    # Take the first sentence.
+    token_embeddings = data[0]
 
-            if len(embedding) == 1:
-                return embedding[0]
+    if not isinstance(token_embeddings, list):
+        raise ValueError(
+            "Unexpected Hugging Face embedding structure."
+        )
 
-            # Mean pooling
-            dimensions = len(
-                embedding[0]
-            )
+    if not token_embeddings:
+        raise ValueError(
+            "Hugging Face returned no token embeddings."
+        )
 
-            pooled = [
-                sum(
-                    token[i]
-                    for token in embedding
-                )
-                / len(embedding)
-                for i in range(dimensions)
-            ]
+    # --------------------------------------------------------
+    # If HF already returned a single vector
+    # --------------------------------------------------------
 
-            return pooled
+    if isinstance(token_embeddings[0], (int, float)):
 
-    raise ValueError(
-        "Unexpected embedding response from Hugging Face."
-    )
+        embedding = [
+            float(value)
+            for value in token_embeddings
+        ]
+
+    # --------------------------------------------------------
+    # Otherwise mean-pool token embeddings
+    # --------------------------------------------------------
+
+    else:
+
+        dimensions = len(token_embeddings[0])
+
+        embedding = [
+            sum(
+                float(token[i])
+                for token in token_embeddings
+            ) / len(token_embeddings)
+            for i in range(dimensions)
+        ]
+
+    # --------------------------------------------------------
+    # Validate MiniLM dimension
+    # --------------------------------------------------------
+
+    if len(embedding) != 384:
+        raise ValueError(
+            f"Unexpected embedding dimension: "
+            f"{len(embedding)}. Expected 384."
+        )
+
+    return embedding
