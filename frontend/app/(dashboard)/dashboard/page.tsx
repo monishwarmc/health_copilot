@@ -16,13 +16,14 @@ import {
 
 import MonitorWeightOutlinedIcon from "@mui/icons-material/MonitorWeightOutlined";
 import RestaurantOutlinedIcon from "@mui/icons-material/RestaurantOutlined";
-import FitnessCenterOutlinedIcon from "@mui/icons-material/FitnessCenterOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 import { useAuth } from "@/context/AuthContext";
 import { getWeightStats } from "@/services/weight.service";
 import { WeightStats } from "@/types/weight";
+import Image from "next/image";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -288,100 +289,6 @@ export default function DashboardPage() {
           </Grid>
 
           {/* =====================================================
-              WORKOUT
-          ===================================================== */}
-
-          <Grid
-            size={{
-              xs: 12,
-              sm: 4,
-            }}
-          >
-            <Card
-              elevation={0}
-              sx={{
-                height: "100%",
-                borderRadius: 3.5,
-                border: "1px solid",
-                borderColor: "divider",
-                transition:
-                  "transform 0.25s ease, box-shadow 0.25s ease",
-                "&:hover": {
-                  transform: "translateY(-3px)",
-                  boxShadow:
-                    "0 12px 30px rgba(0,0,0,0.08)",
-                },
-              }}
-            >
-              <CardContent
-                sx={{
-                  p: {
-                    xs: 2,
-                    sm: 2.5,
-                  },
-                  "&:last-child": {
-                    pb: {
-                      xs: 2,
-                      sm: 2.5,
-                    },
-                  },
-                }}
-              >
-                <Stack spacing={1.5}>
-
-                  <Box
-                    sx={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 2.5,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      bgcolor:
-                        "rgba(255,152,0,0.10)",
-                      color: "warning.main",
-                    }}
-                  >
-                    <FitnessCenterOutlinedIcon />
-                  </Box>
-
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 800,
-                    }}
-                  >
-                    Workout
-                  </Typography>
-
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
-                    Workout tracking is coming
-                    soon.
-                  </Typography>
-
-                  <Button
-                    disabled
-                    endIcon={
-                      <ArrowForwardRoundedIcon />
-                    }
-                    sx={{
-                      alignSelf: "flex-start",
-                      textTransform: "none",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Coming soon
-                  </Button>
-
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* =====================================================
               AI CHAT
           ===================================================== */}
 
@@ -468,6 +375,114 @@ export default function DashboardPage() {
                     }}
                   >
                     Open Chat
+                  </Button>
+
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+
+
+          {/* =====================================================
+              WORKOUT
+          ===================================================== */}
+
+          <Grid
+            size={{
+              xs: 12,
+              sm: 4,
+            }}
+          >
+            <Card
+              elevation={0}
+              sx={{
+                height: "100%",
+                borderRadius: 3.5,
+                border: "1px solid",
+                borderColor: "divider",
+                transition:
+                  "transform 0.25s ease, box-shadow 0.25s ease",
+                "&:hover": {
+                  transform: "translateY(-3px)",
+                  boxShadow:
+                    "0 12px 30px rgba(0,0,0,0.08)",
+                },
+              }}
+            >
+              <CardContent
+                sx={{
+                  p: {
+                    xs: 2,
+                    sm: 2.5,
+                  },
+                  "&:last-child": {
+                    pb: {
+                      xs: 2,
+                      sm: 2.5,
+                    },
+                  },
+                }}
+              >
+                <Stack spacing={1.5}>
+
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 2.5,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      overflow: "hidden",
+                      bgcolor: "rgba(255,152,0,0.10)",
+                      color: "warning.main",
+                    }}
+                  >
+                    {user?.profile_picture ? (
+                      <Image
+                        src={user.profile_picture}
+                        alt="Profile picture"
+                        width={44}
+                        height={44}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    ) : (
+                      <AccountCircleIcon />
+                    )}
+                  </Box>
+
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 800,
+                    }}
+                  >
+                    Profile
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    You can manage your profile info.
+                  </Typography>
+
+                  <Button
+                    href="/profile"
+                    endIcon={
+                      <ArrowForwardRoundedIcon />
+                    }
+                    sx={{
+                      alignSelf: "flex-start",
+                      textTransform: "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Open profile
                   </Button>
 
                 </Stack>

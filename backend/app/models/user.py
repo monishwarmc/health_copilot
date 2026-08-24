@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, date
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
@@ -29,11 +29,17 @@ from app.models.weight import WeightEntry
 
 
 if TYPE_CHECKING:
+    from app.models.chat import ChatConversation
     from app.models.nutrition import NutritionLog
 
 
 class User(Base):
+
     __tablename__ = "users"
+
+    # ============================================================
+    # REPRESENTATION
+    # ============================================================
 
     def __repr__(self) -> str:
         return (
@@ -44,11 +50,19 @@ class User(Base):
             f")"
         )
 
+    # ============================================================
+    # ID
+    # ============================================================
+
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         primary_key=True,
         default=uuid4,
     )
+
+    # ============================================================
+    # BASIC USER INFORMATION
+    # ============================================================
 
     full_name: Mapped[str] = mapped_column(
         String(100),
@@ -67,11 +81,16 @@ class User(Base):
         nullable=True,
     )
 
+    # ============================================================
+    # AUTHENTICATION
+    # ============================================================
+
     auth_provider: Mapped[AuthProvider] = mapped_column(
         Enum(
             AuthProvider,
             values_callable=lambda enum: [
-                member.value for member in enum
+                member.value
+                for member in enum
             ],
             name="auth_provider",
         ),
@@ -86,50 +105,21 @@ class User(Base):
         nullable=True,
     )
 
+    # ============================================================
+    # PROFILE
+    # ============================================================
+
     profile_picture: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
-    )
-
-    is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        default=True,
-        server_default=true(),
-        nullable=False,
-    )
-
-    last_login_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(UTC),
-        server_default=text("CURRENT_TIMESTAMP"),
-        nullable=False,
-    )
-
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
-        server_default=text("CURRENT_TIMESTAMP"),
-        nullable=False,
-    )
-
-    is_verified: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        nullable=False,
-        server_default=false(),
     )
 
     gender: Mapped[Gender | None] = mapped_column(
         Enum(
             Gender,
             values_callable=lambda enum: [
-                gender.value for gender in enum
+                member.value
+                for member in enum
             ],
             name="gender",
         ),
@@ -155,7 +145,8 @@ class User(Base):
         Enum(
             ActivityLevel,
             values_callable=lambda enum: [
-                activity.value for activity in enum
+                member.value
+                for member in enum
             ],
             name="activity_level",
         ),
@@ -166,7 +157,8 @@ class User(Base):
         Enum(
             Goal,
             values_callable=lambda enum: [
-                goal.value for goal in enum
+                member.value
+                for member in enum
             ],
             name="goal",
         ),
@@ -177,7 +169,8 @@ class User(Base):
         Enum(
             DietPreference,
             values_callable=lambda enum: [
-                diet.value for diet in enum
+                member.value
+                for member in enum
             ],
             name="diet_preference",
         ),
@@ -199,21 +192,74 @@ class User(Base):
         nullable=True,
     )
 
-    # ----------------------------------------
-    # Weight relationship
-    # ----------------------------------------
+    # ============================================================
+    # ACCOUNT STATUS
+    # ============================================================
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default=true(),
+        nullable=False,
+    )
+
+    is_verified: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default=false(),
+        nullable=False,
+    )
+
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    # ============================================================
+    # TIMESTAMPS
+    # ============================================================
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
+    )
+
+    # ============================================================
+    # WEIGHT RELATIONSHIP
+    # ============================================================
 
     weights: Mapped[list["WeightEntry"]] = relationship(
+        "WeightEntry",
         back_populates="user",
         cascade="all, delete-orphan",
     )
 
-    # ----------------------------------------
-    # Nutrition relationship
-    # ----------------------------------------
+    # ============================================================
+    # NUTRITION RELATIONSHIP
+    # ============================================================
 
     nutrition_logs: Mapped[list["NutritionLog"]] = relationship(
         "NutritionLog",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    # ============================================================
+    # CHAT RELATIONSHIP
+    # ============================================================
+
+    chat_conversations: Mapped[list["ChatConversation"]] = relationship(
+        "ChatConversation",
         back_populates="user",
         cascade="all, delete-orphan",
     )

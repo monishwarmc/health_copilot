@@ -1,5 +1,3 @@
-// lib/error.ts
-
 import axios from "axios";
 
 interface FastAPIValidationError {
@@ -17,23 +15,26 @@ interface BackendError {
 export default function getErrorMessage(
   error: unknown
 ): string {
+  /* =========================================================
+     AXIOS ERROR
+  ========================================================= */
+
   if (axios.isAxiosError(error)) {
     const responseData = error.response?.data;
 
-    console.error(
-      "API error status:",
-      error.response?.status
-    );
+    /* ---------------------------------------------------------
+       Plain string response
+       Example:
+       "Invalid email or password"
+    --------------------------------------------------------- */
 
-    console.error(
-      "API error response:",
-      responseData
-    );
-
-    // Backend returned a plain string
     if (typeof responseData === "string") {
       return responseData;
     }
+
+    /* ---------------------------------------------------------
+       Backend JSON response
+    --------------------------------------------------------- */
 
     if (
       responseData &&
@@ -42,7 +43,22 @@ export default function getErrorMessage(
       const data =
         responseData as BackendError;
 
-      // FastAPI validation errors
+      /* =======================================================
+         FASTAPI VALIDATION ERROR
+
+         Example:
+
+         {
+           "detail": [
+             {
+               "loc": ["body", "email"],
+               "msg": "value is not a valid email",
+               "type": "value_error"
+             }
+           ]
+         }
+      ======================================================= */
+
       if (Array.isArray(data.detail)) {
         const messages = data.detail
           .map((item) => {
@@ -51,27 +67,16 @@ export default function getErrorMessage(
               typeof item === "object" &&
               typeof item.msg === "string"
             ) {
-              const location = Array.isArray(item.loc)
-                ? item.loc.join(" → ")
-                : "";
-
-              const message =
-                item.msg.replace(
-                  /^Value error,\s*/i,
-                  ""
-                );
-
-              return location
-                ? `${location}: ${message}`
-                : message;
+              return item.msg.replace(
+                /^Value error,\s*/i,
+                ""
+              );
             }
 
             return null;
           })
           .filter(
-            (
-              message
-            ): message is string =>
+            (message): message is string =>
               Boolean(message)
           );
 
@@ -82,41 +87,74 @@ export default function getErrorMessage(
         return "Validation failed.";
       }
 
-      // HTTPException detail
-      if (
-        typeof data.detail === "string"
-      ) {
+      /* =======================================================
+         FASTAPI HTTPException
+
+         Example:
+
+         {
+           "detail": "Invalid email or password"
+         }
+      ======================================================= */
+
+      if (typeof data.detail === "string") {
         return data.detail;
       }
 
-      // Custom msg
-      if (
-        typeof data.msg === "string"
-      ) {
+      /* =======================================================
+         CUSTOM msg
+
+         {
+           "msg": "Invalid email or password"
+         }
+      ======================================================= */
+
+      if (typeof data.msg === "string") {
         return data.msg;
       }
 
-      // Custom message
-      if (
-        typeof data.message === "string"
-      ) {
+      /* =======================================================
+         CUSTOM message
+
+         {
+           "message": "Invalid email or password"
+         }
+      ======================================================= */
+
+      if (typeof data.message === "string") {
         return data.message;
       }
     }
 
+    /* =========================================================
+       FALLBACK
+    ========================================================= */
+
     return (
       error.message ||
-      "Request failed."
+      "Request failed. Please try again."
     );
   }
+
+  /* =========================================================
+     NORMAL JAVASCRIPT ERROR
+  ========================================================= */
 
   if (error instanceof Error) {
     return error.message;
   }
 
+  /* =========================================================
+     STRING ERROR
+  ========================================================= */
+
   if (typeof error === "string") {
     return error;
   }
 
-  return "An unexpected error occurred.";
+  /* =========================================================
+     UNKNOWN ERROR
+  ========================================================= */
+
+  return "Something went wrong. Please try again.";
 }

@@ -13,7 +13,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 
-function reset_password() {
+function ResetPassword() {
 
   const searchParams = useSearchParams();
   
@@ -115,4 +115,4 @@ function reset_password() {
   )
 }
 
-export default reset_password
+export default ResetPassword;

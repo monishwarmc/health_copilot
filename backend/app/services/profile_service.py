@@ -1,13 +1,21 @@
-from app.models.user import User
-from app.schemas.profile import ProfileResponse, ProfileUpdateRequest
 from sqlalchemy.orm import Session
-from app.repositories.profile_repository import profile_repository
+
 from app.core.logging import logger
-
-
+from app.models.user import User
+from app.repositories.profile_repository import (
+    profile_repository,
+)
+from app.schemas.profile import (
+    ProfileResponse,
+    ProfileUpdateRequest,
+)
 
 
 class ProfileService:
+
+    # ============================================================
+    # GET PROFILE
+    # ============================================================
 
     def get_profile(
         self,
@@ -18,12 +26,15 @@ class ProfileService:
             current_user
         )
 
+    # ============================================================
+    # UPDATE PROFILE
+    # ============================================================
 
     def update_profile(
         self,
-        request: ProfileUpdateRequest,
+        db: Session,
         current_user: User,
-        db: Session
+        request: ProfileUpdateRequest,
     ) -> ProfileResponse:
 
         data = request.model_dump(
@@ -31,6 +42,7 @@ class ProfileService:
         )
 
         for field, value in data.items():
+
             setattr(
                 current_user,
                 field,

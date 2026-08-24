@@ -24,7 +24,7 @@ export default function RootLayout({
       <body>
         <Script
           src="https://accounts.google.com/gsi/client"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
         />
         <AppRouterCacheProvider>
             <ThemeProvider>

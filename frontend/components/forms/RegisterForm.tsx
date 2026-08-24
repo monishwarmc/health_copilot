@@ -27,7 +27,7 @@ export default function RegisterForm() {
 
     const router = useRouter()
 
-    const {register: registerUser, googleAuth} = useAuth()
+    const {register: registerUser} = useAuth()
 
     const {
       register,
@@ -66,23 +66,9 @@ export default function RegisterForm() {
         }
     };
 
-    const handleGoogleSignIn = async () => {
-        const toastId = toast.loading("Signing in with Google...");
-
-        try {
-            await googleAuth()
-            toast.success("successfully signed in with google");
-        } catch(e) {
-            let err = getErrorMessage(e)
-            toast.error(err);
-        } finally {
-            toast.dismiss(toastId);
-        }
-    };
-
     return (
         <form onSubmit={handleSubmit(onSubmit)}>
-            <GoogleButton onClick={handleGoogleSignIn} />
+            <GoogleButton />
             
             <Divider sx={{ py: 3 }}>
                 OR

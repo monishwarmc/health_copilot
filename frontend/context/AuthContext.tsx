@@ -5,28 +5,34 @@ import {
   useContext,
   useEffect,
   useState,
-  ReactNode,
-  useRef
+  type ReactNode,
 } from "react";
 
-import { User } from "@/types/user";
-import { getCurrentUser } from "@/services/auth.service";
-import {
-  getAccessToken,
-  removeAccessToken,
-} from "@/lib/auth";
+import type {
+  User,
+  ProfileUpdateData,
+} from "@/types/user";
 
 import {
+  getCurrentUser,
   login as loginApi,
   register as registerApi,
   verifyEmail as verifyEmailApi,
   profile as profileApi,
   password as passwordApi,
   account as deleteApi,
-  googleLogin as googleLoginApi
+  googleLogin as googleLoginApi,
 } from "@/services/auth.service";
 
-import { setAccessToken } from "@/lib/auth";
+import {
+  getAccessToken,
+  removeAccessToken,
+  setAccessToken,
+} from "@/lib/auth";
+
+/* ============================================================
+   AUTH CONTEXT TYPE
+============================================================ */
 
 interface AuthContextType {
   user: User | null;
@@ -41,9 +47,9 @@ interface AuthContextType {
   ) => Promise<void>;
 
   register: (
-      full_name: string,
-      email: string,
-      password: string
+    full_name: string,
+    email: string,
+    password: string
   ) => Promise<string>;
 
   account: (
@@ -52,8 +58,7 @@ interface AuthContextType {
   ) => Promise<string>;
 
   profile: (
-    full_name: string | null,
-    profile_picture: string | null
+    data: ProfileUpdateData
   ) => Promise<User>;
 
   password: (
@@ -62,10 +67,13 @@ interface AuthContextType {
   ) => Promise<string>;
 
   verifyEmail: (
-      token: string
+    token: string
   ) => Promise<string>;
 
-  googleAuth: () => Promise<void>;
+  googleAuth: (
+    credential: string
+  ) => Promise<void>;
+
   googleVerify: () => Promise<string>;
 
   refreshUser: () => Promise<void>;
@@ -73,262 +81,286 @@ interface AuthContextType {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(
-  undefined
-);
+/* ============================================================
+   CONTEXT
+============================================================ */
+
+const AuthContext =
+  createContext<
+    AuthContextType | undefined
+  >(undefined);
+
+/* ============================================================
+   PROVIDER PROPS
+============================================================ */
 
 interface AuthProviderProps {
   children: ReactNode;
 }
 
+/* ============================================================
+   PROVIDER
+============================================================ */
+
 export function AuthProvider({
   children,
 }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] =
+    useState<User | null>(null);
 
-  const googlePromise = useRef<{
-    resolve?: (idToken: string) => void;
-    reject?: (error: unknown) => void;
-  }>({});
+  const [isLoading, setIsLoading] =
+    useState(true);
 
-  const googleInitialized = useRef(false);
+  /* ==========================================================
+     LOGIN
+  ========================================================== */
 
   const login = async (
-  email: string,
-  password: string
-  ) => {
-  const response = await loginApi({
-      email,
-      password,
-  });
+    email: string,
+    password: string
+  ): Promise<void> => {
+    const response =
+      await loginApi({
+        email,
+        password,
+      });
 
-  setAccessToken(
-      response.data.token.access_token
-  );
+    setAccessToken(
+      response.data.token
+        .access_token
+    );
 
-  setUser(response.data.user);
+    setUser(
+      response.data.user
+    );
   };
 
+  /* ==========================================================
+     REGISTER
+  ========================================================== */
+
   const register = async (
-      full_name: string,
-      email: string,
-      password: string
+    full_name: string,
+    email: string,
+    password: string
   ): Promise<string> => {
-      const response = await registerApi({
+    const response =
+      await registerApi({
         full_name,
         email,
         password,
       });
-      return response.data.message;
+
+    return response.data.message;
   };
+
+  /* ==========================================================
+     VERIFY EMAIL
+  ========================================================== */
 
   const verifyEmail = async (
-      token: string
+    token: string
   ): Promise<string> => {
+    const response =
+      await verifyEmailApi(token);
 
-      const response = await verifyEmailApi(
-          token
-      );
-
-      return response.data.message;
+    return response.data.message;
   };
 
-  const profile = async(
-    full_name: string | null,
-    profile_picture: string | null
-  ): Promise<User> => {
-    const response = await profileApi(
-      full_name,
-      profile_picture
-    )
-    setUser(response.data);
-    return response.data;
-  }
+  /* ==========================================================
+     UPDATE PROFILE
+  ========================================================== */
 
-  const password = async(
+  const profile = async (
+    data: ProfileUpdateData
+  ): Promise<User> => {
+    const response =
+      await profileApi(data);
+
+    setUser(response.data);
+
+    return response.data;
+  };
+
+  /* ==========================================================
+     CHANGE PASSWORD
+  ========================================================== */
+
+  const password = async (
     old_password: string,
     new_password: string
   ): Promise<string> => {
-    const response = await passwordApi(
-      old_password,
-      new_password
-    )
-    return response.data.message;
-  }
+    const response =
+      await passwordApi(
+        old_password,
+        new_password
+      );
 
-  const account = async(
+    return response.data.message;
+  };
+
+  /* ==========================================================
+     GOOGLE LOGIN
+  ========================================================== */
+
+  const googleAuth = async (
+    credential: string
+  ): Promise<void> => {
+    const response =
+      await googleLoginApi({
+        id_token: credential,
+      });
+
+    setAccessToken(
+      response.data.token
+        .access_token
+    );
+
+    setUser(
+      response.data.user
+    );
+  };
+
+  /* ==========================================================
+     GOOGLE VERIFY
+  ========================================================== */
+
+  /*
+   * This is NOT used for normal Google login.
+   *
+   * Google login is handled by GoogleButton.
+   *
+   * This remains here because the current profile page
+   * expects googleVerify() for Google account deletion.
+   *
+   * We will implement Google re-authentication separately.
+   */
+
+  const googleVerify =
+    async (): Promise<string> => {
+      throw new Error(
+        "Google re-authentication is not implemented yet."
+      );
+    };
+
+  /* ==========================================================
+     DELETE ACCOUNT
+  ========================================================== */
+
+  const account = async (
     password: string | null,
     google_token: string | null
   ): Promise<string> => {
-    const reponse = await deleteApi(
-      password,
-      google_token
-    )
-    removeAccessToken();
-    setUser(null);
-    return reponse.data.message;
-  }
-
-  useEffect(() => {
-    if (googleInitialized.current) return;
-
-    if (!window.google) return;
-
-    googleInitialized.current = true;
-
-    window.google.accounts.id.initialize({
-      client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
-      callback: (response: CredentialResponse) => {
-        googlePromise.current.resolve?.(
-          response.credential
-        );
-      },
-    });
-  }, []);
-
-  const googleVerify = () => {
-      return new Promise<string>((resolve, reject) => {
-        if (!window.google) {
-          reject(new Error("Google SDK not loaded"));
-          return;
-        }
-
-        let settled = false;
-
-        const finish = (error: Error) => {
-          if (settled) return;
-
-          settled = true;
-          clearTimeout(timeout);
-          googlePromise.current = {};
-
-          reject(error);
-        };
-
-        const timeout = setTimeout(() => {
-          finish(
-            new Error(
-              "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
-            )
-          );
-        }, 10000);
-
-        googlePromise.current = {
-          resolve: (idToken) => {
-            if (settled) return;
-
-            settled = true;
-            clearTimeout(timeout);
-            googlePromise.current = {};
-
-            resolve(idToken);
-          },
-
-          reject: (error) =>
-            finish(
-              error instanceof Error
-                ? error
-                : new Error("Google Sign-In failed.")
-            ),
-        };
-
-        window.google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed()) {
-            console.log(
-              "Google Not Displayed:",
-              notification.getNotDisplayedReason()
-            );
-
-            finish(
-              new Error(
-                "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
-              )
-            );
-            return;
-          }
-
-          if (notification.isSkippedMoment()) {
-            console.log(
-              "Google Skipped:",
-              notification.getSkippedReason()
-            );
-
-            finish(
-              new Error(
-                "Google Sign-In couldn't start. Please enable Third-party Sign-in option in Settings and try again."
-              )
-            );
-            return;
-          }
-
-        });
-      });
-    };
-
-    const googleAuth = async()=>{
-      const id_token = await googleVerify()
-      const response = await googleLoginApi({
-          id_token,
-      });
-
-      setAccessToken(
-          response.data.token.access_token
+    const response =
+      await deleteApi(
+        password,
+        google_token
       );
 
-      setUser(response.data.user);
-    }
+    removeAccessToken();
 
-    const refreshUser = async () => {
+    setUser(null);
+
+    return response.data.message;
+  };
+
+  /* ==========================================================
+     REFRESH CURRENT USER
+  ========================================================== */
+
+  const refreshUser =
+    async (): Promise<void> => {
       try {
-        const response = await getCurrentUser();
-        setUser(response.data);
+        const response =
+          await getCurrentUser();
+
+        setUser(
+          response.data
+        );
       } catch {
         removeAccessToken();
+
         setUser(null);
       }
     };
 
-    const logout = () => {
-      removeAccessToken();
-      setUser(null);
-    };
+  /* ==========================================================
+     LOGOUT
+  ========================================================== */
+
+  const logout = (): void => {
+    removeAccessToken();
+
+    setUser(null);
+  };
+
+  /* ==========================================================
+     INITIAL AUTH CHECK
+  ========================================================== */
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      const token = getAccessToken();
+    let mounted = true;
 
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
+    const initializeAuth =
+      async () => {
+        const token =
+          getAccessToken();
 
-      await refreshUser();
-      setIsLoading(false);
+        if (!token) {
+          if (mounted) {
+            setIsLoading(false);
+          }
+
+          return;
+        }
+
+        await refreshUser();
+
+        if (mounted) {
+          setIsLoading(false);
+        }
+      };
+
+    void initializeAuth();
+
+    return () => {
+      mounted = false;
     };
-
-    initializeAuth();
   }, []);
+
+  /* ==========================================================
+     PROVIDER
+  ========================================================== */
 
   return (
     <AuthContext.Provider
       value={{
-          user,
-          isAuthenticated: !!user,
-          isLoading,
+        user,
 
-          login,
-          register,
-          verifyEmail,
-          googleVerify,
-          googleAuth,
-          profile,
-          password,
-          account,
+        isAuthenticated:
+          !!user,
 
-          refreshUser,
+        isLoading,
 
-          logout,
+        login,
+
+        register,
+
+        verifyEmail,
+
+        googleAuth,
+
+        googleVerify,
+
+        profile,
+
+        password,
+
+        account,
+
+        refreshUser,
+
+        logout,
       }}
     >
       {children}
@@ -336,8 +368,13 @@ export function AuthProvider({
   );
 }
 
+/* ============================================================
+   useAuth
+============================================================ */
+
 export function useAuth() {
-  const context = useContext(AuthContext);
+  const context =
+    useContext(AuthContext);
 
   if (!context) {
     throw new Error(

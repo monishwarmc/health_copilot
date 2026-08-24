@@ -13,7 +13,7 @@ import SendIcon from '@mui/icons-material/Send';
 import { useRouter } from 'next/navigation';
 
 
-function forgot_password() {
+function ForgotPassword() {
   
   const router = useRouter()
 
@@ -95,4 +95,4 @@ function forgot_password() {
   )
 }
 
-export default forgot_password
+export default ForgotPassword;

@@ -42,11 +42,6 @@ const navigationItems = [
     icon: <MonitorWeightOutlinedIcon />,
   },
   {
-    label: "Workout",
-    path: "/workout",
-    icon: <FitnessCenterOutlinedIcon />,
-  },
-  {
     label: "AI Chat",
     path: "/chat",
     icon: <ChatOutlinedIcon />,

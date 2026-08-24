@@ -25,7 +25,7 @@ import { useAuth } from "@/context/AuthContext";
 import getErrorMessage from "@/lib/error";
 
 export default function LoginForm() {
-  const { login, googleAuth } = useAuth();
+  const { login } = useAuth();
   const searchParams = useSearchParams();
 
   const {
@@ -72,22 +72,9 @@ export default function LoginForm() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    const toastId = toast.loading("Signing in with Google...");
-
-    try {
-      await googleAuth()
-      toast.success("successfully logged in with google");
-    } catch (e) {
-      toast.error(getErrorMessage(e));
-    } finally {
-      toast.dismiss(toastId);
-    }
-  };
-
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <GoogleButton onClick={handleGoogleSignIn} />
+      <GoogleButton />
 
       <Divider sx={{ py: 3 }}>OR</Divider>
 

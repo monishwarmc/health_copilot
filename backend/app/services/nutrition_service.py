@@ -5,9 +5,6 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.logging import logger
-from app.exceptions.nutrition import (
-    NutritionFoodNotFoundException,
-)
 from app.exceptions.weight import (
     ResourceAccessDeniedException,
     ResourceNotFoundException,
@@ -51,32 +48,24 @@ class NutritionService:
             items=[
                 FoodSearchItem(
                     id=food.id,
-
                     name=food.name,
-
                     source="usda_fdc",
-
                     calories_per_100g=(
                         food.calories_per_100g
                     ),
-
                     protein_g_per_100g=(
                         food.protein_g_per_100g
                     ),
-
                     carbs_g_per_100g=(
                         food.carbs_g_per_100g
                     ),
-
                     fat_g_per_100g=(
                         food.fat_g_per_100g
                     ),
-
                     fiber_g_per_100g=(
                         food.fiber_g_per_100g
                     ),
                 )
-
                 for food in foods
             ]
         )
@@ -90,18 +79,42 @@ class NutritionService:
         db: Session,
         request: NutritionCreateRequest,
         current_user: User,
+        source: str = "usda_fdc",
     ) -> NutritionResponse:
 
-        # Get USDA food only to obtain the canonical
-        # food name and verify the food ID.
-        food = nutrition_provider.get_food(
-            request.food_id
-        )
+        food = None
+
+        # ----------------------------------------------------
+        # USDA source
+        # ----------------------------------------------------
+        #
+        # Normal nutrition API calls use a real USDA FDC ID.
+        #
+        # ----------------------------------------------------
+
+        if source == "usda_fdc":
+
+            food = nutrition_provider.get_food(
+                request.food_id
+            )
+
+        # ----------------------------------------------------
+        # Create nutrition log
+        # ----------------------------------------------------
 
         nutrition = NutritionLog(
             user_id=current_user.id,
 
-            food_name=food.name,
+            # USDA:
+            #     use canonical USDA food name
+            #
+            # AI:
+            #     use the food name supplied by the LLM
+            food_name=(
+                food.name
+                if food
+                else request.food_id
+            ),
 
             quantity=Decimal(
                 str(request.quantity)
@@ -113,8 +126,9 @@ class NutritionService:
 
             notes=request.notes,
 
-            # IMPORTANT:
-            # These values come directly from frontend.
+            # These values come from the request.
+            # For chat actions they are the values
+            # estimated by the AI.
             calories=Decimal(
                 str(request.calories)
             ),
@@ -135,9 +149,18 @@ class NutritionService:
                 str(request.fiber_g)
             ),
 
-            source="usda_fdc",
+            source=source,
 
-            source_food_id=food.id,
+            # USDA:
+            #     actual FDC ID
+            #
+            # AI:
+            #     no USDA ID
+            source_food_id=(
+                food.id
+                if food
+                else None
+            ),
 
             recorded_at=(
                 request.recorded_at
@@ -194,16 +217,11 @@ class NutritionService:
                 NutritionResponse.model_validate(
                     nutrition
                 )
-
                 for nutrition in nutrition_logs
             ],
-
             total=total,
-
             page=page,
-
             limit=limit,
-
             pages=(
                 (total + limit - 1) // limit
             ),
@@ -262,38 +280,45 @@ class NutritionService:
             nutrition.source = "usda_fdc"
 
         # ----------------------------------------------------
-        # Raw values from frontend
+        # Raw nutrition values
         # ----------------------------------------------------
 
         if "quantity" in data:
+
             nutrition.quantity = Decimal(
                 str(data["quantity"])
             )
 
         if "unit" in data:
+
             nutrition.unit = data["unit"]
 
         if "calories" in data:
+
             nutrition.calories = Decimal(
                 str(data["calories"])
             )
 
         if "protein_g" in data:
+
             nutrition.protein_g = Decimal(
                 str(data["protein_g"])
             )
 
         if "carbs_g" in data:
+
             nutrition.carbs_g = Decimal(
                 str(data["carbs_g"])
             )
 
         if "fat_g" in data:
+
             nutrition.fat_g = Decimal(
                 str(data["fat_g"])
             )
 
         if "fiber_g" in data:
+
             nutrition.fiber_g = Decimal(
                 str(data["fiber_g"])
             )
@@ -303,16 +328,19 @@ class NutritionService:
         # ----------------------------------------------------
 
         if "meal_type" in data:
+
             nutrition.meal_type = data[
                 "meal_type"
             ]
 
         if "notes" in data:
+
             nutrition.notes = data[
                 "notes"
             ]
 
         if "recorded_at" in data:
+
             nutrition.recorded_at = data[
                 "recorded_at"
             ]
@@ -350,6 +378,7 @@ class NutritionService:
         )
 
         if nutrition is None:
+
             raise ResourceNotFoundException(
                 "nutrition entry"
             )
@@ -358,6 +387,7 @@ class NutritionService:
             nutrition.user_id
             != current_user.id
         ):
+
             raise ResourceAccessDeniedException(
                 "nutrition entry"
             )

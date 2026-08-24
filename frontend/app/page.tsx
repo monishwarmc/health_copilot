@@ -708,7 +708,7 @@ export default function Home() {
                   <RestaurantOutlinedIcon />
                 }
                 title="Nutrition"
-                description="Keep track of your daily nutrition and understand what you're putting into your body."
+                description="Keep track of your daily nutrition and understand what You&apos;re putting into your body."
               />
 
               <FeatureCard
