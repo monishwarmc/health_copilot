@@ -1,3 +1,5 @@
+import math
+
 import requests
 
 from app.core.config import settings
@@ -11,19 +13,71 @@ HF_URL = (
 )
 
 
-def get_embedding(text: str) -> list[float]:
+def _mean_pool(
+    token_embeddings: list[list[float]],
+) -> list[float]:
+
+    if not token_embeddings:
+        raise ValueError(
+            "Hugging Face returned empty token embeddings."
+        )
+
+    dimensions = len(token_embeddings[0])
+
+    if dimensions == 0:
+        raise ValueError(
+            "Hugging Face returned zero-dimensional embeddings."
+        )
+
+    embedding = [
+        sum(
+            float(token[i])
+            for token in token_embeddings
+        ) / len(token_embeddings)
+        for i in range(dimensions)
+    ]
+
+    return embedding
+
+
+def _normalize(
+    embedding: list[float],
+) -> list[float]:
+
+    magnitude = math.sqrt(
+        sum(
+            value * value
+            for value in embedding
+        )
+    )
+
+    if magnitude == 0:
+        return embedding
+
+    return [
+        value / magnitude
+        for value in embedding
+    ]
+
+
+def generate_embedding(
+    text: str,
+) -> list[float]:
 
     if not text or not text.strip():
-        raise ValueError("Cannot create embedding from empty text.")
+        raise ValueError(
+            "Cannot generate embedding for empty text."
+        )
 
     headers = {
-        "Authorization": f"Bearer {settings.HF_TOKEN}",
+        "Authorization": (
+            f"Bearer {settings.HF_TOKEN}"
+        ),
         "Content-Type": "application/json",
     }
 
     payload = {
         "inputs": text,
-        "normalize": True,
     }
 
     response = requests.post(
@@ -37,85 +91,165 @@ def get_embedding(text: str) -> list[float]:
 
     data = response.json()
 
-    # --------------------------------------------------------
-    # HF feature-extraction returns token embeddings:
+    print(
+        "\n========== HUGGING FACE EMBEDDING =========="
+    )
+
+    print(
+        f"Response type: {type(data).__name__}"
+    )
+
+    if isinstance(data, list):
+        print(
+            f"Top-level length: {len(data)}"
+        )
+
+        if data:
+            print(
+                f"First element type: "
+                f"{type(data[0]).__name__}"
+            )
+
+            if isinstance(data[0], list):
+                print(
+                    f"First nested length: "
+                    f"{len(data[0])}"
+                )
+
+    print(
+        "=============================================\n"
+    )
+
+    # ========================================================
+    # CASE 1
+    #
+    # Single embedding:
+    #
+    # [
+    #     0.12,
+    #     -0.04,
+    #     ...
+    # ]
+    #
+    # ========================================================
+
+    if (
+        isinstance(data, list)
+        and data
+        and isinstance(data[0], (int, float))
+    ):
+
+        embedding = [
+            float(value)
+            for value in data
+        ]
+
+    # ========================================================
+    # CASE 2
+    #
+    # Multiple/token embeddings:
     #
     # [
     #     [
-    #         [384 values],   # token 1
-    #         [384 values],   # token 2
+    #         0.12,
+    #         -0.04,
+    #         ...
+    #     ],
+    #     [
     #         ...
     #     ]
     # ]
     #
-    # We need one 384-dimensional sentence embedding.
-    # --------------------------------------------------------
+    # ========================================================
 
-    if not isinstance(data, list):
-        raise ValueError(
-            f"Unexpected embedding response from Hugging Face: "
-            f"{type(data).__name__}"
+    elif (
+        isinstance(data, list)
+        and data
+        and isinstance(data[0], list)
+        and data[0]
+        and isinstance(data[0][0], (int, float))
+    ):
+
+        embedding = _mean_pool(
+            [
+                [
+                    float(value)
+                    for value in token
+                ]
+                for token in data
+            ]
         )
 
-    if not data:
-        raise ValueError(
-            "Hugging Face returned an empty embedding response."
-        )
-
-    # Single sentence:
+    # ========================================================
+    # CASE 3
     #
-    # data = [
-    #     [token_embedding, token_embedding, ...]
+    # Batched token embeddings:
+    #
+    # [
+    #     [
+    #         [
+    #             0.12,
+    #             -0.04,
+    #             ...
+    #         ],
+    #         ...
+    #     ]
     # ]
     #
-    # Take the first sentence.
-    token_embeddings = data[0]
+    # ========================================================
 
-    if not isinstance(token_embeddings, list):
+    elif (
+        isinstance(data, list)
+        and data
+        and isinstance(data[0], list)
+        and data[0]
+        and isinstance(data[0][0], list)
+    ):
+
+        token_embeddings = data[0]
+
+        embedding = _mean_pool(
+            [
+                [
+                    float(value)
+                    for value in token
+                ]
+                for token in token_embeddings
+            ]
+        )
+
+    else:
+
+        print(
+            "Unexpected Hugging Face response:"
+        )
+
+        print(
+            repr(data)
+        )
+
         raise ValueError(
             "Unexpected Hugging Face embedding structure."
         )
 
-    if not token_embeddings:
-        raise ValueError(
-            "Hugging Face returned no token embeddings."
-        )
+    # ========================================================
+    # NORMALIZE
+    # ========================================================
 
-    # --------------------------------------------------------
-    # If HF already returned a single vector
-    # --------------------------------------------------------
+    embedding = _normalize(
+        embedding
+    )
 
-    if isinstance(token_embeddings[0], (int, float)):
-
-        embedding = [
-            float(value)
-            for value in token_embeddings
-        ]
-
-    # --------------------------------------------------------
-    # Otherwise mean-pool token embeddings
-    # --------------------------------------------------------
-
-    else:
-
-        dimensions = len(token_embeddings[0])
-
-        embedding = [
-            sum(
-                float(token[i])
-                for token in token_embeddings
-            ) / len(token_embeddings)
-            for i in range(dimensions)
-        ]
-
-    # --------------------------------------------------------
-    # Validate MiniLM dimension
-    # --------------------------------------------------------
+    # ========================================================
+    # VALIDATE
+    # ========================================================
 
     if len(embedding) != 384:
+
         raise ValueError(
-            f"Unexpected embedding dimension: "
-            f"{len(embedding)}. Expected 384."
+            "Unexpected embedding dimension: "
+            f"{len(embedding)}. "
+            "Expected 384."
         )
 
     return embedding
