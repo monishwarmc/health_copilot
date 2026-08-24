@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     CHROMA_DATABASE: str
 
     GEMINI_KEY: str
+    
+    HF_TOKEN: str
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

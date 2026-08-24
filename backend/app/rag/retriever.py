@@ -1,3 +1,7 @@
+from app.providers.embedding import (
+    generate_embedding,
+)
+
 from app.rag.chroma import collection
 
 
@@ -5,13 +9,14 @@ def retrieve(
     query: str,
     n_results: int = 5,
 ):
+
+    embedding = generate_embedding(
+        query
+    )
+
     results = collection.query(
-        query_texts=[query],
+        query_embeddings=[embedding],
         n_results=n_results,
     )
 
-    chunks = results["documents"][0] or []
-    sources = results["metadatas"][0] or []
-    distances = results["distances"][0] or []
-
-    return chunks, sources, distances
+    return results
