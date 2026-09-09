@@ -588,6 +588,7 @@ export default function ChatPage() {
 
         display: "flex",
         flexDirection: "column",
+        overflow:"hidden"
       }}
     >
       <Card
