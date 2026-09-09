@@ -603,8 +603,6 @@ export default function ChatPage() {
           border: "1px solid",
           borderColor: "divider",
           borderRadius: 3,
-
-          overflow: "hidden",
         }}
       >
         <Box
@@ -619,8 +617,6 @@ export default function ChatPage() {
               xs: "column",
               md: "row",
             },
-
-            overflow: "hidden",
           }}
         >
           {/* =================================================
@@ -635,12 +631,6 @@ export default function ChatPage() {
                */
               minHeight: 0,
               minWidth: 0,
-
-              /*
-               * Desktop sidebar occupies its own
-               * scrolling region.
-               */
-              overflow: "hidden",
 
               display: "flex",
               flexDirection: "column",
@@ -698,8 +688,6 @@ export default function ChatPage() {
 
               display: "flex",
               flexDirection: "column",
-
-              overflow: "hidden",
             }}
           >
             {/* Header */}
@@ -812,9 +800,6 @@ export default function ChatPage() {
                 },
 
                 py: 3,
-
-                overscrollBehavior:
-                  "contain",
               }}
             >
               {loadingConversation ? (
