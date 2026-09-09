@@ -586,8 +586,6 @@ export default function ChatPage() {
         height: "100%",
         minHeight: 0,
 
-        overflow: "hidden",
-
         display: "flex",
         flexDirection: "column",
       }}
