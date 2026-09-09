@@ -642,7 +642,7 @@ export default function ChatPage() {
               },
 
               maxHeight: {
-                xs: 280,
+                xs: 200,
                 md: "100%",
               },
             }}
