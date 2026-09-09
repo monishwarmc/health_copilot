@@ -636,8 +636,6 @@ export default function ChatPage() {
               display: "flex",
               flexDirection: "column",
 
-              flexShrink: 0,
-
               width: {
                 xs: "100%",
                 md: 300,
