@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Box } from "@mui/material";
 
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 import CopilotLauncher from "@/components/chat/CopilotLauncher";
+import MobileAppNavigation from "./MobileAppNavigation";
 
 export default function DashboardLayout({
   children,
@@ -13,6 +14,21 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [standalone, setStandalone] = useState(false);
+
+  useEffect(() => {
+    const displayMode = window.matchMedia("(display-mode: standalone)");
+    const updateStandalone = () => {
+      setStandalone(
+        displayMode.matches ||
+          (navigator as Navigator & { standalone?: boolean }).standalone === true,
+      );
+    };
+
+    updateStandalone();
+    displayMode.addEventListener("change", updateStandalone);
+    return () => displayMode.removeEventListener("change", updateStandalone);
+  }, []);
 
   return (
     <Box
@@ -66,6 +82,9 @@ export default function DashboardLayout({
               sm: 3,
               md: 4,
             },
+            pb: standalone
+              ? { xs: "calc(80px + env(safe-area-inset-bottom))", md: 4 }
+              : undefined,
           }}
         >
           <Box
@@ -80,6 +99,7 @@ export default function DashboardLayout({
         </Box>
       </Box>
       <CopilotLauncher />
+      {standalone && <MobileAppNavigation />}
     </Box>
   );
 }

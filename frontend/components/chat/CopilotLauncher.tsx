@@ -152,6 +152,9 @@ export default function CopilotLauncher() {
               position: "fixed",
               right: { xs: 16, sm: 24 },
               bottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+              "@media (display-mode: standalone) and (max-width: 899px)": {
+                bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+              },
               zIndex: (theme) => theme.zIndex.drawer + 2,
               px: { xs: 0, sm: 2.2 },
               width: { xs: 56, sm: "auto" },

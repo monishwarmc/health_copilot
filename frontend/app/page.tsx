@@ -21,6 +21,7 @@ import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 
 import Logo from "@/components/ui/Logo";
+import InstallAppButton from "@/components/pwa/InstallAppButton";
 
 export default function Home() {
   return (
@@ -390,6 +391,8 @@ export default function Home() {
               >
                 Sign in
               </Button>
+
+              <InstallAppButton size="large" />
             </Stack>
           </Stack>
 

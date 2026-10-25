@@ -1,15 +1,33 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ThemeProvider from "@/components/ui/ThemeProvider";
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "@/context/AuthContext";
+import PWARegistration from "@/components/pwa/PWARegistration";
 import Script from "next/script";
 
 
 export const metadata: Metadata = {
   title: "Health Copilot",
   description: "Health and fitness AI assistant",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icons/health-copilot-192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Health Copilot",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#087f8c",
 };
 
 export default function RootLayout({
@@ -21,6 +39,9 @@ export default function RootLayout({
     <html
       lang="en"
     >
+      <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+      </head>
       <body>
         <Script
           src="https://accounts.google.com/gsi/client"
@@ -29,6 +50,7 @@ export default function RootLayout({
         <AppRouterCacheProvider>
             <ThemeProvider>
               <AuthProvider>
+                  <PWARegistration />
                   {children}
               <Toaster
                 position="top-right"

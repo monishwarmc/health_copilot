@@ -14,6 +14,7 @@ import RestaurantOutlinedIcon from "@mui/icons-material/RestaurantOutlined";
 import MonitorWeightOutlinedIcon from "@mui/icons-material/MonitorWeightOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import PersonIcon from "@mui/icons-material/Person";
+import InstallAppButton from "@/components/pwa/InstallAppButton";
 
 import { usePathname, useRouter } from "next/navigation";
 
@@ -194,6 +195,10 @@ export default function Sidebar({
           );
         })}
       </List>
+
+      <Box sx={{ mt: "auto", p: 2, borderTop: "1px solid", borderColor: "divider" }}>
+        <InstallAppButton fullWidth size="small" />
+      </Box>
     </Box>
   );
 
