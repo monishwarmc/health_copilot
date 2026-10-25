@@ -586,10 +586,9 @@ export default function ChatPage() {
         height: "100%",
         minHeight: 0,
 
-        overflow: "hidden",
-
         display: "flex",
         flexDirection: "column",
+        overflow:"hidden"
       }}
     >
       <Card
@@ -605,8 +604,6 @@ export default function ChatPage() {
           border: "1px solid",
           borderColor: "divider",
           borderRadius: 3,
-
-          overflow: "hidden",
         }}
       >
         <Box
@@ -621,8 +618,6 @@ export default function ChatPage() {
               xs: "column",
               md: "row",
             },
-
-            overflow: "hidden",
           }}
         >
           {/* =================================================
@@ -638,16 +633,8 @@ export default function ChatPage() {
               minHeight: 0,
               minWidth: 0,
 
-              /*
-               * Desktop sidebar occupies its own
-               * scrolling region.
-               */
-              overflow: "hidden",
-
               display: "flex",
               flexDirection: "column",
-
-              flexShrink: 0,
 
               width: {
                 xs: "100%",
@@ -655,7 +642,6 @@ export default function ChatPage() {
               },
 
               maxHeight: {
-                xs: 280,
                 md: "100%",
               },
             }}
@@ -700,8 +686,6 @@ export default function ChatPage() {
 
               display: "flex",
               flexDirection: "column",
-
-              overflow: "hidden",
             }}
           >
             {/* Header */}
@@ -814,9 +798,6 @@ export default function ChatPage() {
                 },
 
                 py: 3,
-
-                overscrollBehavior:
-                  "contain",
               }}
             >
               {loadingConversation ? (
