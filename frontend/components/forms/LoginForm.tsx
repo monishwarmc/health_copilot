@@ -155,7 +155,7 @@ export default function LoginForm() {
         align="center"
         sx={{ mt: 2 }}
       >
-        Don't have an account?{" "}
+        Don&apos;t have an account?{" "}
         <Button
           variant="outlined"
           href="/register"

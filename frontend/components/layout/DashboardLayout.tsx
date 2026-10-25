@@ -5,6 +5,7 @@ import { Box } from "@mui/material";
 
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
+import CopilotLauncher from "@/components/chat/CopilotLauncher";
 
 export default function DashboardLayout({
   children,
@@ -78,6 +79,7 @@ export default function DashboardLayout({
           </Box>
         </Box>
       </Box>
+      <CopilotLauncher />
     </Box>
   );
 }

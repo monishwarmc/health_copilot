@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.enums import MealType
 
@@ -38,7 +38,14 @@ class FoodSearchResponse(BaseModel):
 
 class NutritionCreateRequest(BaseModel):
 
-    food_id: str = Field(
+    food_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+    )
+
+    food_name: str | None = Field(
+        default=None,
         min_length=1,
         max_length=255,
     )
@@ -80,6 +87,19 @@ class NutritionCreateRequest(BaseModel):
 
     recorded_at: date | None = None
 
+    @model_validator(mode="after")
+    def validate_food_identity(self):
+        has_food_id = bool(self.food_id and self.food_id.strip())
+        has_food_name = bool(self.food_name and self.food_name.strip())
+
+        if has_food_id == has_food_name:
+            raise ValueError("Provide exactly one of food_id or food_name.")
+
+        if self.food_name is not None:
+            self.food_name = self.food_name.strip()
+
+        return self
+
 
 # ============================================================
 # UPDATE
@@ -89,6 +109,12 @@ class NutritionCreateRequest(BaseModel):
 class NutritionUpdateRequest(BaseModel):
 
     food_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+    )
+
+    food_name: str | None = Field(
         default=None,
         min_length=1,
         max_length=255,
@@ -135,6 +161,18 @@ class NutritionUpdateRequest(BaseModel):
     notes: str | None = None
 
     recorded_at: date | None = None
+
+    @model_validator(mode="after")
+    def validate_food_update(self):
+        if self.food_id is not None and self.food_name is not None:
+            raise ValueError("Provide either food_id or food_name, not both.")
+
+        if self.food_name is not None:
+            self.food_name = self.food_name.strip()
+            if not self.food_name:
+                raise ValueError("Food name cannot be empty.")
+
+        return self
 
 
 # ============================================================
@@ -193,3 +231,25 @@ class NutritionListResponse(BaseModel):
     limit: int
 
     pages: int
+
+
+class NutritionDaySummary(BaseModel):
+    recorded_at: date
+    entries: int
+    calories: float
+    protein_g: float
+    carbs_g: float
+    fat_g: float
+    fiber_g: float
+
+
+class NutritionSummaryResponse(BaseModel):
+    start_date: date
+    end_date: date
+    days: list[NutritionDaySummary]
+    entries: int
+    calories: float
+    protein_g: float
+    carbs_g: float
+    fat_g: float
+    fiber_g: float

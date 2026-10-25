@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from app.schemas.user import UserResponse
 from pydantic import field_validator
+from app.schemas.profile import ProfileUpdateRequest
 
 
 def validate_password(value:str):
@@ -78,17 +79,6 @@ class ResetPasswordRequest(BaseModel):
         return validate_password(value=value)
     
     
-class ProfileUpdateRequest(BaseModel):
-    full_name: str | None = None
-    @field_validator("full_name")
-    @classmethod
-    def validate(cls, value: str):
-        if value is None:
-            return value
-        return validate_name(value=value)
-    profile_picture: str | None = None
-    
-
 class PasswordChangeRequest(BaseModel):
     old_password: str 
     @field_validator("old_password")

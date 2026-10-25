@@ -154,7 +154,15 @@ export default function GoogleButton() {
               use_fedcm_for_button:
                 true,
 
-              width: "100%",
+              width: Math.min(
+                Math.max(
+                  Math.floor(
+                    buttonRef.current.clientWidth
+                  ),
+                  120
+                ),
+                400
+              ),
             }
           );
 

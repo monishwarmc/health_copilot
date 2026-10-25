@@ -40,23 +40,25 @@ export interface User {
 
   auth_provider: AuthProvider;
 
-  height_cm: string;
+  height_cm: number | null;
 
-  gender: Gender;
+  target_weight_kg: number | null;
 
-  date_of_birth: string;
+  gender: Gender | null;
 
-  activity_level: ActivityLevel;
+  date_of_birth: string | null;
 
-  goal: Goal;
+  activity_level: ActivityLevel | null;
 
-  diet_preference: DietPreference;
+  goal: Goal | null;
 
-  medical_conditions: string;
+  diet_preference: DietPreference | null;
 
-  food_allergies: string;
+  medical_conditions: string | null;
 
-  bio: string;
+  food_allergies: string | null;
+
+  bio: string | null;
 }
 
 export interface ProfileUpdateData {
@@ -65,6 +67,8 @@ export interface ProfileUpdateData {
   profile_picture?: string | null;
 
   height_cm?: number | null;
+
+  target_weight_kg?: number | null;
 
   gender?: Gender;
 
@@ -76,9 +80,9 @@ export interface ProfileUpdateData {
 
   diet_preference?: DietPreference;
 
-  medical_conditions?: string;
+  medical_conditions?: string | null;
 
-  food_allergies?: string;
+  food_allergies?: string | null;
 
-  bio?: string;
+  bio?: string | null;
 }

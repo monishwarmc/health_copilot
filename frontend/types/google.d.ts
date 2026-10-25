@@ -22,6 +22,8 @@ declare global {
       ) => void | Promise<void>;
 
       auto_select?: boolean;
+
+      context?: "signin" | "signup" | "use";
     }
 
     interface GsiButtonConfiguration {

@@ -11,7 +11,6 @@ from app.services.profile_service import (
     profile_service,
 )
 
-# Change this import to your existing auth dependency
 from app.dependencies import get_current_user
 
 

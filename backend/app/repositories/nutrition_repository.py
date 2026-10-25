@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -8,6 +9,33 @@ from app.models.nutrition import NutritionLog
 
 
 class NutritionRepository:
+
+    def daily_summary(
+        self,
+        db: Session,
+        user_id: UUID,
+        start_date: date,
+        end_date: date,
+    ) -> list[dict]:
+        statement = (
+            select(
+                NutritionLog.recorded_at.label("recorded_at"),
+                func.count(NutritionLog.id).label("entries"),
+                func.coalesce(func.sum(NutritionLog.calories), 0).label("calories"),
+                func.coalesce(func.sum(NutritionLog.protein_g), 0).label("protein_g"),
+                func.coalesce(func.sum(NutritionLog.carbs_g), 0).label("carbs_g"),
+                func.coalesce(func.sum(NutritionLog.fat_g), 0).label("fat_g"),
+                func.coalesce(func.sum(NutritionLog.fiber_g), 0).label("fiber_g"),
+            )
+            .where(
+                NutritionLog.user_id == user_id,
+                NutritionLog.recorded_at >= start_date,
+                NutritionLog.recorded_at <= end_date,
+            )
+            .group_by(NutritionLog.recorded_at)
+            .order_by(NutritionLog.recorded_at.asc())
+        )
+        return [dict(row._mapping) for row in db.execute(statement)]
 
     def create(
         self,

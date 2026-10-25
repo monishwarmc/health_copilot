@@ -1,4 +1,5 @@
 from uuid import UUID
+from datetime import date
 
 from fastapi import (
     APIRouter,
@@ -18,6 +19,7 @@ from app.schemas.nutrition import (
     NutritionCreateRequest,
     NutritionListResponse,
     NutritionResponse,
+    NutritionSummaryResponse,
     NutritionUpdateRequest,
 )
 from app.services.nutrition_service import (
@@ -125,6 +127,29 @@ def list_nutrition(
         limit=limit,
         sort=sort,
     )
+
+
+@router.get(
+    "/summary",
+    response_model=NutritionSummaryResponse,
+)
+def nutrition_summary(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> NutritionSummaryResponse:
+    try:
+        return nutrition_service.summary(
+            db=db,
+            current_user=current_user,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except ValueError as error:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 # ============================================================

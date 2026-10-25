@@ -32,9 +32,6 @@ export default function WeightStatsCard({
     100
   );
 
-  const isWeightLoss =
-    stats.starting_weight > stats.target_weight;
-
   return (
     <Card
       elevation={0}

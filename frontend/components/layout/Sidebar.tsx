@@ -12,7 +12,6 @@ import {
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import RestaurantOutlinedIcon from "@mui/icons-material/RestaurantOutlined";
 import MonitorWeightOutlinedIcon from "@mui/icons-material/MonitorWeightOutlined";
-import FitnessCenterOutlinedIcon from "@mui/icons-material/FitnessCenterOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import PersonIcon from "@mui/icons-material/Person";
 

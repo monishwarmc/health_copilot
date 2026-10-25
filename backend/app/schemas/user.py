@@ -29,6 +29,8 @@ class UserResponse(BaseModel):
     auth_provider: AuthProvider
     
     height_cm: float | None = None
+
+    target_weight_kg: float | None = None
     
     gender: Gender | None = None
     

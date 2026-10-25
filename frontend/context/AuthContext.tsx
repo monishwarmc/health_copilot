@@ -18,11 +18,12 @@ import {
   login as loginApi,
   register as registerApi,
   verifyEmail as verifyEmailApi,
-  profile as profileApi,
   password as passwordApi,
   account as deleteApi,
   googleLogin as googleLoginApi,
 } from "@/services/auth.service";
+
+import { updateProfile as updateProfileApi } from "@/services/profile.service";
 
 import {
   getAccessToken,
@@ -73,8 +74,6 @@ interface AuthContextType {
   googleAuth: (
     credential: string
   ) => Promise<void>;
-
-  googleVerify: () => Promise<string>;
 
   refreshUser: () => Promise<void>;
 
@@ -175,11 +174,16 @@ export function AuthProvider({
     data: ProfileUpdateData
   ): Promise<User> => {
     const response =
-      await profileApi(data);
+      await updateProfileApi(data);
 
-    setUser(response.data);
+    const updatedUser = {
+      ...user,
+      ...response.data,
+    } as User;
 
-    return response.data;
+    setUser(updatedUser);
+
+    return updatedUser;
   };
 
   /* ==========================================================
@@ -220,28 +224,6 @@ export function AuthProvider({
       response.data.user
     );
   };
-
-  /* ==========================================================
-     GOOGLE VERIFY
-  ========================================================== */
-
-  /*
-   * This is NOT used for normal Google login.
-   *
-   * Google login is handled by GoogleButton.
-   *
-   * This remains here because the current profile page
-   * expects googleVerify() for Google account deletion.
-   *
-   * We will implement Google re-authentication separately.
-   */
-
-  const googleVerify =
-    async (): Promise<string> => {
-      throw new Error(
-        "Google re-authentication is not implemented yet."
-      );
-    };
 
   /* ==========================================================
      DELETE ACCOUNT
@@ -349,8 +331,6 @@ export function AuthProvider({
         verifyEmail,
 
         googleAuth,
-
-        googleVerify,
 
         profile,
 

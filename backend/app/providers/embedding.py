@@ -29,13 +29,17 @@ def _mean_pool(
             "Hugging Face returned zero-dimensional embeddings."
         )
 
-    embedding = [
-        sum(
-            float(token[i])
-            for token in token_embeddings
-        ) / len(token_embeddings)
-        for i in range(dimensions)
-    ]
+    if any(len(token) != dimensions for token in token_embeddings):
+        raise ValueError(
+            "Hugging Face returned token embeddings with inconsistent dimensions."
+        )
+
+    embedding = []
+    for index in range(dimensions):
+        values = [float(token[index]) for token in token_embeddings]
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("Hugging Face returned a non-finite embedding value.")
+        embedding.append(sum(values) / len(values))
 
     return embedding
 
@@ -52,7 +56,10 @@ def _normalize(
     )
 
     if magnitude == 0:
-        return embedding
+        raise ValueError("Hugging Face returned a zero-length embedding.")
+
+    if not math.isfinite(magnitude):
+        raise ValueError("Hugging Face returned a non-finite embedding.")
 
     return [
         value / magnitude
@@ -69,6 +76,9 @@ def generate_embedding(
             "Cannot generate embedding for empty text."
         )
 
+    if not settings.HF_TOKEN:
+        raise RuntimeError("HF_TOKEN is not configured.")
+
     headers = {
         "Authorization": (
             f"Bearer {settings.HF_TOKEN}"
@@ -80,45 +90,19 @@ def generate_embedding(
         "inputs": text,
     }
 
-    response = requests.post(
-        HF_URL,
-        headers=headers,
-        json=payload,
-        timeout=30,
-    )
-
-    response.raise_for_status()
-
-    data = response.json()
-
-    print(
-        "\n========== HUGGING FACE EMBEDDING =========="
-    )
-
-    print(
-        f"Response type: {type(data).__name__}"
-    )
-
-    if isinstance(data, list):
-        print(
-            f"Top-level length: {len(data)}"
+    try:
+        response = requests.post(
+            HF_URL,
+            headers=headers,
+            json=payload,
+            timeout=(5, 30),
         )
-
-        if data:
-            print(
-                f"First element type: "
-                f"{type(data[0]).__name__}"
-            )
-
-            if isinstance(data[0], list):
-                print(
-                    f"First nested length: "
-                    f"{len(data[0])}"
-                )
-
-    print(
-        "=============================================\n"
-    )
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException as exc:
+        raise RuntimeError("Hugging Face embedding request failed.") from exc
+    except ValueError as exc:
+        raise RuntimeError("Hugging Face returned invalid JSON.") from exc
 
     # ========================================================
     # CASE 1
@@ -219,15 +203,6 @@ def generate_embedding(
         )
 
     else:
-
-        print(
-            "Unexpected Hugging Face response:"
-        )
-
-        print(
-            repr(data)
-        )
-
         raise ValueError(
             "Unexpected Hugging Face embedding structure."
         )
@@ -251,5 +226,8 @@ def generate_embedding(
             f"{len(embedding)}. "
             "Expected 384."
         )
+
+    if not all(math.isfinite(value) for value in embedding):
+        raise ValueError("Hugging Face returned a non-finite embedding.")
 
     return embedding

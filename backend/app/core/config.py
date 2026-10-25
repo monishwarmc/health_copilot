@@ -1,5 +1,7 @@
 from pathlib import Path
+from typing import Any
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,6 +46,25 @@ class Settings(BaseSettings):
     GEMINI_KEY: str
     
     HF_TOKEN: str
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug_setting(cls, value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+
+        if isinstance(value, (int, float)):
+            return value != 0
+
+        return str(value).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+            "debug",
+            "development",
+            "dev",
+        }
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

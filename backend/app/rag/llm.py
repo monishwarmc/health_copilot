@@ -19,12 +19,6 @@ if not api_key:
         "GEMINI_KEY is not configured."
     )
 
-print(
-    f"Gemini API key loaded: "
-    f"{api_key[:10]}..."
-)
-
-
 # ============================================================
 # GEMINI CLIENT
 # ============================================================

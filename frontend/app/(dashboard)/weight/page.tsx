@@ -40,6 +40,7 @@ import {
   WeightStats,
   WeightListResponse,
 } from "@/types/weight";
+import { useAuth } from "@/context/AuthContext";
 
 /* =========================================================
    TYPES
@@ -134,6 +135,7 @@ function getProgress(
 ========================================================= */
 
 export default function WeightPage() {
+  const { profile: updateProfile } = useAuth();
   /* -------------------------------------------------------
      WEIGHT DATA
   ------------------------------------------------------- */
@@ -144,9 +146,6 @@ export default function WeightPage() {
   /* -------------------------------------------------------
      PROFILE
   ------------------------------------------------------- */
-
-  const [profile, setProfile] =
-    useState<ProfileResponse | null>(null);
 
   const [targetWeight, setTargetWeight] =
     useState<number | null>(null);
@@ -221,8 +220,6 @@ export default function WeightPage() {
       setWeights(weightsResponse.data.items);
 
       setStats(statsResponse.data);
-
-      setProfile(profileResponse.data);
 
       setTargetWeight(
         profileResponse.data.target_weight_kg
@@ -316,19 +313,11 @@ export default function WeightPage() {
       setError(null);
       setSuccess(null);
 
-      const response =
-        await api.patch<ProfileResponse>(
-          "/profile",
-          {
-            target_weight_kg: parsedTarget,
-          }
-        );
+      const updatedProfile = await updateProfile({
+        target_weight_kg: parsedTarget,
+      });
 
-      setProfile(response.data);
-
-      setTargetWeight(
-        response.data.target_weight_kg
-      );
+      setTargetWeight(updatedProfile.target_weight_kg);
 
       const statsResponse =
         await api.get<WeightStats>(

@@ -51,8 +51,8 @@ export default function RegisterForm() {
             router.push(`/check-email?message=${encodeURIComponent(message)}`);
             reset();
         } catch (error) {
-            let err = getErrorMessage(error)
-            if (err == "Email already registered, please login") {
+            const err = getErrorMessage(error)
+            if (err === "Email already registered, please login") {
                 router.replace(
                 `/login?email=${encodeURIComponent(
                     data.email

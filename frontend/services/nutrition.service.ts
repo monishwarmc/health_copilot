@@ -74,12 +74,36 @@ export interface NutritionListResponse {
   pages: number;
 }
 
+export interface NutritionDaySummary {
+  recorded_at: string;
+  entries: number;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+}
+
+export interface NutritionSummaryResponse {
+  start_date: string;
+  end_date: string;
+  days: NutritionDaySummary[];
+  entries: number;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+}
+
 /* ============================================================================
  * Requests
  * ========================================================================== */
 
 export interface NutritionCreateRequest {
-  food_id: string;
+  food_id?: string;
+
+  food_name?: string;
 
   quantity: number;
 
@@ -100,6 +124,8 @@ export interface NutritionCreateRequest {
 
 export interface NutritionUpdateRequest {
   food_id?: string | null;
+
+  food_name?: string | null;
 
   quantity?: number | null;
 
@@ -164,6 +190,14 @@ export const getNutrition = (
     }
   );
 };
+
+export const getNutritionSummary = (
+  startDate: string,
+  endDate: string,
+) =>
+  api.get<NutritionSummaryResponse>("/nutrition/summary", {
+    params: { start_date: startDate, end_date: endDate },
+  });
 
 export const updateNutrition = (
   nutritionId: string,

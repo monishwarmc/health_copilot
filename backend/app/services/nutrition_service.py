@@ -25,11 +25,45 @@ from app.schemas.nutrition import (
     NutritionCreateRequest,
     NutritionListResponse,
     NutritionResponse,
+    NutritionSummaryResponse,
     NutritionUpdateRequest,
 )
 
 
 class NutritionService:
+
+    def summary(
+        self,
+        db: Session,
+        current_user: User,
+        start_date: date,
+        end_date: date,
+    ) -> NutritionSummaryResponse:
+        if start_date > end_date:
+            raise ValueError("Start date must be on or before end date.")
+        if (end_date - start_date).days > 30:
+            raise ValueError("Nutrition summaries are limited to 31 days.")
+
+        daily_rows = nutrition_repository.daily_summary(
+            db=db,
+            user_id=current_user.id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        totals = {
+            "entries": sum(row["entries"] for row in daily_rows),
+            "calories": sum(float(row["calories"]) for row in daily_rows),
+            "protein_g": sum(float(row["protein_g"]) for row in daily_rows),
+            "carbs_g": sum(float(row["carbs_g"]) for row in daily_rows),
+            "fat_g": sum(float(row["fat_g"]) for row in daily_rows),
+            "fiber_g": sum(float(row["fiber_g"]) for row in daily_rows),
+        }
+        return NutritionSummaryResponse(
+            start_date=start_date,
+            end_date=end_date,
+            days=daily_rows,
+            **totals,
+        )
 
     # ========================================================
     # SEARCH USDA
@@ -79,10 +113,12 @@ class NutritionService:
         db: Session,
         request: NutritionCreateRequest,
         current_user: User,
-        source: str = "usda_fdc",
+        source: str | None = None,
     ) -> NutritionResponse:
 
         food = None
+        resolved_source = source or "usda_fdc"
+        food_name = request.food_name
 
         # ----------------------------------------------------
         # USDA source
@@ -92,11 +128,18 @@ class NutritionService:
         #
         # ----------------------------------------------------
 
-        if source == "usda_fdc":
+        if request.food_name is not None:
+            resolved_source = "manual"
+            food_name = request.food_name.strip()
+        elif resolved_source == "usda_fdc":
 
             food = nutrition_provider.get_food(
-                request.food_id
+                request.food_id or ""
             )
+
+            food_name = food.name
+        else:
+            food_name = request.food_id
 
         # ----------------------------------------------------
         # Create nutrition log
@@ -110,11 +153,7 @@ class NutritionService:
             #
             # AI:
             #     use the food name supplied by the LLM
-            food_name=(
-                food.name
-                if food
-                else request.food_id
-            ),
+            food_name=food_name or "",
 
             quantity=Decimal(
                 str(request.quantity)
@@ -149,7 +188,7 @@ class NutritionService:
                 str(request.fiber_g)
             ),
 
-            source=source,
+            source=resolved_source,
 
             # USDA:
             #     actual FDC ID
@@ -267,7 +306,7 @@ class NutritionService:
         # Food
         # ----------------------------------------------------
 
-        if "food_id" in data:
+        if data.get("food_id") is not None:
 
             food = nutrition_provider.get_food(
                 data["food_id"]
@@ -278,6 +317,13 @@ class NutritionService:
             nutrition.source_food_id = food.id
 
             nutrition.source = "usda_fdc"
+
+        if data.get("food_name") is not None:
+            updated_food_name = data["food_name"].strip()
+            if updated_food_name != nutrition.food_name:
+                nutrition.food_name = updated_food_name
+                nutrition.source_food_id = None
+                nutrition.source = "manual"
 
         # ----------------------------------------------------
         # Raw nutrition values

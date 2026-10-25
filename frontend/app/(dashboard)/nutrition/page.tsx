@@ -28,6 +28,8 @@ import {
   Select,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 
@@ -57,7 +59,38 @@ import getErrorMessage from "@/lib/error";
  * Types
  * ========================================================================== */
 
-type Unit = "g" | "kg";
+type Unit = "g" | "kg" | "serving" | "piece" | "ml";
+
+type NutrientKey =
+  | "calories"
+  | "protein_g"
+  | "carbs_g"
+  | "fat_g"
+  | "fiber_g";
+
+type NutrientValues = Record<NutrientKey, string>;
+
+const nutrientFields: {
+  key: NutrientKey;
+  label: string;
+  suffix: string;
+}[] = [
+  { key: "calories", label: "Calories", suffix: "kcal" },
+  { key: "protein_g", label: "Protein", suffix: "g" },
+  { key: "carbs_g", label: "Carbohydrates", suffix: "g" },
+  { key: "fat_g", label: "Fat", suffix: "g" },
+  { key: "fiber_g", label: "Fiber", suffix: "g" },
+];
+
+function emptyNutrients(): NutrientValues {
+  return {
+    calories: "",
+    protein_g: "",
+    carbs_g: "",
+    fat_g: "",
+    fiber_g: "",
+  };
+}
 
 /* ============================================================================
  * Helpers
@@ -92,9 +125,12 @@ function formatNumber(
 }
 
 function today(): string {
-  return new Date()
-    .toISOString()
-    .split("T")[0];
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 function formatDate(
@@ -237,6 +273,9 @@ function calculateNutrition(
  * ========================================================================== */
 
 export default function NutritionPage() {
+  const [entryMode, setEntryMode] =
+    useState<"database" | "manual">("database");
+
   /* --------------------------------------------------------------------------
    * Search
    * ------------------------------------------------------------------------ */
@@ -261,6 +300,12 @@ export default function NutritionPage() {
     useState<FoodSearchItem | null>(
       null
     );
+
+  const [manualFoodName, setManualFoodName] =
+    useState("");
+
+  const [manualNutrients, setManualNutrients] =
+    useState<NutrientValues>(emptyNutrients);
 
   /* --------------------------------------------------------------------------
    * Form
@@ -322,6 +367,15 @@ export default function NutritionPage() {
   const [editingQuantity, setEditingQuantity] =
     useState("");
 
+  const [editingFoodName, setEditingFoodName] =
+    useState("");
+
+  const [editingUnit, setEditingUnit] =
+    useState<Unit>("g");
+
+  const [editingNutrients, setEditingNutrients] =
+    useState<NutrientValues>(emptyNutrients);
+
   const [editingMealType, setEditingMealType] =
     useState<MealType>("breakfast");
 
@@ -352,7 +406,7 @@ export default function NutritionPage() {
       return value * 1000;
     }
 
-    return value;
+    return unit === "g" ? value : 0;
   }, [quantity, unit]);
 
   /* ==========================================================================
@@ -376,6 +430,24 @@ export default function NutritionPage() {
       selectedFood,
       quantityInGrams,
     ]);
+
+  const parsedManualNutrition = useMemo(() => {
+    const values = Object.fromEntries(
+      nutrientFields.map(({ key }) => [key, Number(manualNutrients[key])]),
+    ) as Record<NutrientKey, number>;
+
+    if (
+      nutrientFields.some(({ key }) =>
+        manualNutrients[key].trim() === "" ||
+        !Number.isFinite(values[key]) ||
+        values[key] < 0,
+      )
+    ) {
+      return null;
+    }
+
+    return values;
+  }, [manualNutrients]);
 
   /* ==========================================================================
    * Load nutrition entries
@@ -574,7 +646,10 @@ export default function NutritionPage() {
    * ======================================================================== */
 
   const handleSave = async () => {
-    if (!selectedFood) {
+    const foodName = manualFoodName.trim();
+    const numericQuantity = Number(quantity);
+
+    if (entryMode === "database" && !selectedFood) {
       toast.error(
         "Select a food first."
       );
@@ -582,9 +657,12 @@ export default function NutritionPage() {
       return;
     }
 
-    if (
-      quantityInGrams <= 0
-    ) {
+    if (entryMode === "manual" && !foodName) {
+      toast.error("Enter a name for this food.");
+      return;
+    }
+
+    if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) {
       toast.error(
         "Enter a valid quantity."
       );
@@ -592,11 +670,16 @@ export default function NutritionPage() {
       return;
     }
 
-    if (
-      !calculatedNutrition
-    ) {
+    const nutritionValues =
+      entryMode === "manual"
+        ? parsedManualNutrition
+        : calculatedNutrition;
+
+    if (!nutritionValues) {
       toast.error(
-        "Nutrition could not be calculated."
+        entryMode === "manual"
+          ? "Enter valid, non-negative nutrient values for this entry."
+          : "Nutrition could not be calculated."
       );
 
       return;
@@ -621,8 +704,9 @@ export default function NutritionPage() {
        * recorded_at
        */
       await createNutrition({
-        food_id:
-          selectedFood.id,
+        ...(entryMode === "manual"
+          ? { food_name: foodName }
+          : { food_id: selectedFood!.id }),
 
         quantity:
           Number(quantity),
@@ -632,20 +716,15 @@ export default function NutritionPage() {
         meal_type:
           mealType,
 
-        calories:
-          calculatedNutrition.calories,
+        calories: nutritionValues.calories,
 
-        protein_g:
-          calculatedNutrition.protein_g,
+        protein_g: nutritionValues.protein_g,
 
-        carbs_g:
-          calculatedNutrition.carbs_g,
+        carbs_g: nutritionValues.carbs_g,
 
-        fat_g:
-          calculatedNutrition.fat_g,
+        fat_g: nutritionValues.fat_g,
 
-        fiber_g:
-          calculatedNutrition.fiber_g,
+        fiber_g: nutritionValues.fiber_g,
 
         notes:
           notes.trim() || null,
@@ -668,9 +747,13 @@ export default function NutritionPage() {
 
       setSearch("");
 
-      setQuantity("100");
+      setManualFoodName("");
 
-      setUnit("g");
+      setManualNutrients(emptyNutrients());
+
+      setQuantity(entryMode === "manual" ? "1" : "100");
+
+      setUnit(entryMode === "manual" ? "serving" : "g");
 
       setMealType(
         "breakfast"
@@ -795,9 +878,21 @@ export default function NutritionPage() {
   ) => {
     setEditingId(entry.id);
 
+    setEditingFoodName(entry.food_name);
+
     setEditingQuantity(
       String(entry.quantity)
     );
+
+    setEditingUnit(entry.unit as Unit);
+
+    setEditingNutrients({
+      calories: String(entry.calories),
+      protein_g: String(entry.protein_g),
+      carbs_g: String(entry.carbs_g),
+      fat_g: String(entry.fat_g),
+      fiber_g: String(entry.fiber_g),
+    });
 
     setEditingMealType(
       entry.meal_type
@@ -819,7 +914,13 @@ export default function NutritionPage() {
   const handleCancelEdit = () => {
     setEditingId(null);
 
+    setEditingFoodName("");
+
     setEditingQuantity("");
+
+    setEditingUnit("g");
+
+    setEditingNutrients(emptyNutrients());
 
     setEditingNotes("");
 
@@ -855,6 +956,27 @@ export default function NutritionPage() {
       return;
     }
 
+    const foodName = editingFoodName.trim();
+    const nutrientValues = Object.fromEntries(
+      nutrientFields.map(({ key }) => [key, Number(editingNutrients[key])]),
+    ) as Record<NutrientKey, number>;
+
+    if (!foodName) {
+      toast.error("Food name cannot be empty.");
+      return;
+    }
+
+    if (
+      nutrientFields.some(({ key }) =>
+        editingNutrients[key].trim() === "" ||
+        !Number.isFinite(nutrientValues[key]) ||
+        nutrientValues[key] < 0,
+      )
+    ) {
+      toast.error("Enter valid, non-negative nutrient values.");
+      return;
+    }
+
     try {
       setUpdating(true);
 
@@ -866,29 +988,31 @@ export default function NutritionPage() {
         await updateNutrition(
           entry.id,
           {
+            food_name: foodName,
+
             quantity:
               numericQuantity,
 
             unit:
-              entry.unit,
+              editingUnit,
 
             meal_type:
               editingMealType,
 
             calories:
-              entry.calories,
+              nutrientValues.calories,
 
             protein_g:
-              entry.protein_g,
+              nutrientValues.protein_g,
 
             carbs_g:
-              entry.carbs_g,
+              nutrientValues.carbs_g,
 
             fat_g:
-              entry.fat_g,
+              nutrientValues.fat_g,
 
             fiber_g:
-              entry.fiber_g,
+              nutrientValues.fiber_g,
 
             notes:
               editingNotes.trim() ||
@@ -960,6 +1084,23 @@ export default function NutritionPage() {
           ).getTime()
       );
     }, [entries]);
+
+  const todayTotals = useMemo(
+    () =>
+      entries
+        .filter((entry) => entry.recorded_at === today())
+        .reduce(
+          (totals, entry) => ({
+            calories: totals.calories + Number(entry.calories || 0),
+            protein_g: totals.protein_g + Number(entry.protein_g || 0),
+            carbs_g: totals.carbs_g + Number(entry.carbs_g || 0),
+            fat_g: totals.fat_g + Number(entry.fat_g || 0),
+            fiber_g: totals.fiber_g + Number(entry.fiber_g || 0),
+          }),
+          { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 },
+        ),
+    [entries],
+  );
 
   /* ==========================================================================
    * Render
@@ -1040,6 +1181,44 @@ export default function NutritionPage() {
         </Stack>
       </Stack>
 
+      <Card
+        variant="outlined"
+        sx={{
+          mb: 3,
+          borderRadius: 3.5,
+          borderColor: "rgba(34,197,94,0.22)",
+          background: "linear-gradient(120deg, rgba(34,197,94,0.07), rgba(33,150,243,0.035))",
+        }}
+      >
+        <CardContent sx={{ p: { xs: 2, sm: 2.5 }, "&:last-child": { pb: { xs: 2, sm: 2.5 } } }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ justifyContent: "space-between", alignItems: { sm: "center" }, mb: 2 }}>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>Today&apos;s nutrition</Typography>
+              <Typography variant="caption" color="text.secondary">Totals from meals logged today</Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              {entries.filter((entry) => entry.recorded_at === today()).length} meals logged
+            </Typography>
+          </Stack>
+          <Grid container spacing={1.25}>
+            {[
+              { label: "Energy", value: todayTotals.calories, unit: "kcal" },
+              { label: "Protein", value: todayTotals.protein_g, unit: "g" },
+              { label: "Carbs", value: todayTotals.carbs_g, unit: "g" },
+              { label: "Fat", value: todayTotals.fat_g, unit: "g" },
+              { label: "Fiber", value: todayTotals.fiber_g, unit: "g" },
+            ].map(({ label, value, unit: valueUnit }) => (
+              <Grid key={label} size={{ xs: 6, sm: 4, md: 2.4 }}>
+                <NutritionValue
+                  label={label}
+                  value={`${formatNumber(round(value))} ${valueUnit}`}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </CardContent>
+      </Card>
+
       {/* =====================================================================
           MAIN GRID
           =================================================================== */}
@@ -1081,7 +1260,51 @@ export default function NutritionPage() {
                   Add food
                 </Typography>
 
+                <ToggleButtonGroup
+                  exclusive
+                  fullWidth
+                  size="small"
+                  value={entryMode}
+                  aria-label="Choose how to add food"
+                  onChange={(_, value: "database" | "manual" | null) => {
+                    if (!value) return;
+
+                    setEntryMode(value);
+                    setSelectedFood(null);
+                    setSearch("");
+                    setSearchResults([]);
+                    setSearchError("");
+                    setQuantity(value === "manual" ? "1" : "100");
+                    setUnit(value === "manual" ? "serving" : "g");
+                    setManualFoodName("");
+                    setManualNutrients(emptyNutrients());
+                  }}
+                  sx={{
+                    borderRadius: 2.5,
+                    bgcolor: "action.hover",
+                    p: 0.5,
+                    border: 0,
+                    "& .MuiToggleButtonGroup-grouped": {
+                      border: 0,
+                      borderRadius: "8px !important",
+                      textTransform: "none",
+                      fontWeight: 700,
+                      minHeight: 42,
+                    },
+                  }}
+                >
+                  <ToggleButton value="database" aria-label="Search food database">
+                    Search database
+                  </ToggleButton>
+                  <ToggleButton value="manual" aria-label="Add a custom food manually">
+                    Add custom food
+                  </ToggleButton>
+                </ToggleButtonGroup>
+
                 {/* Search */}
+
+                {entryMode === "database" && (
+                  <>
 
                 <Stack
                   direction={{
@@ -1339,11 +1562,14 @@ export default function NutritionPage() {
                   </Card>
                 )}
 
+                  </>
+                )}
+
                 {/* Selected food */}
 
-                {selectedFood && (
+                {(selectedFood || entryMode === "manual") && (
                   <>
-                    <Card
+                    {selectedFood && <Card
                       sx={{
                         borderRadius: 3,
                         bgcolor:
@@ -1410,7 +1636,24 @@ export default function NutritionPage() {
                           </IconButton>
                         </Stack>
                       </CardContent>
-                    </Card>
+                    </Card>}
+
+                    {entryMode === "manual" && (
+                      <Stack spacing={1.5}>
+                        <TextField
+                          label="Food or recipe name"
+                          placeholder="e.g. homemade paneer bowl"
+                          value={manualFoodName}
+                          onChange={(event) => setManualFoodName(event.target.value)}
+                          fullWidth
+                          required
+                          slotProps={{ htmlInput: { maxLength: 255 } }}
+                        />
+                        <Alert severity="info" sx={{ borderRadius: 2.5 }}>
+                          Enter the nutrients for the full amount logged below. These values are saved as entered.
+                        </Alert>
+                      </Stack>
+                    )}
 
                     {/* Quantity */}
 
@@ -1478,6 +1721,16 @@ export default function NutritionPage() {
                             kilograms
                             (kg)
                           </MenuItem>
+                          {entryMode === "manual" &&
+                            (["serving", "piece", "ml"] as const).map(
+                              (manualUnit) => (
+                                <MenuItem key={manualUnit} value={manualUnit}>
+                                  {manualUnit === "ml"
+                                    ? "millilitres (ml)"
+                                    : manualUnit}
+                                </MenuItem>
+                              ),
+                            )}
                         </Select>
                       </FormControl>
                     </Stack>
@@ -1605,7 +1858,7 @@ export default function NutritionPage() {
 
                     {/* Nutrition preview */}
 
-                    {calculatedNutrition && (
+                    {entryMode === "database" && calculatedNutrition && (
                       <Card
                         variant="outlined"
                         sx={{
@@ -1716,6 +1969,41 @@ export default function NutritionPage() {
                       </Card>
                     )}
 
+                    {entryMode === "manual" && (
+                      <Card variant="outlined" sx={{ borderRadius: 3 }}>
+                        <CardContent>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.75 }}>
+                            Nutrients for this entry
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Use the food label or your recipe estimate. Enter 0 when a value is unknown.
+                          </Typography>
+                          <Grid container spacing={1.5}>
+                            {nutrientFields.map(({ key, label, suffix }) => (
+                              <Grid key={key} size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                  label={`${label} (${suffix})`}
+                                  type="number"
+                                  value={manualNutrients[key]}
+                                  onChange={(event) =>
+                                    setManualNutrients((current) => ({
+                                      ...current,
+                                      [key]: event.target.value,
+                                    }))
+                                  }
+                                  fullWidth
+                                  required
+                                  slotProps={{
+                                    htmlInput: { min: 0, step: "any", inputMode: "decimal" },
+                                  }}
+                                />
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {/* Save */}
 
                     <Button
@@ -1736,9 +2024,10 @@ export default function NutritionPage() {
                       }
                       disabled={
                         saving ||
-                        !selectedFood ||
-                        quantityInGrams <=
-                          0
+                        !Number.isFinite(Number(quantity)) ||
+                        Number(quantity) <= 0 ||
+                        (entryMode === "database" && !selectedFood) ||
+                        (entryMode === "manual" && (!manualFoodName.trim() || !parsedManualNutrition))
                       }
                       fullWidth
                     >
@@ -1927,6 +2216,9 @@ export default function NutritionPage() {
                                   editingQuantity={
                                     editingQuantity
                                   }
+                                  editingFoodName={editingFoodName}
+                                  editingUnit={editingUnit}
+                                  editingNutrients={editingNutrients}
                                   editingMealType={
                                     editingMealType
                                   }
@@ -1956,6 +2248,14 @@ export default function NutritionPage() {
                                   }
                                   onQuantityChange={
                                     setEditingQuantity
+                                  }
+                                  onFoodNameChange={setEditingFoodName}
+                                  onUnitChange={setEditingUnit}
+                                  onNutrientChange={(key, value) =>
+                                    setEditingNutrients((current) => ({
+                                      ...current,
+                                      [key]: value,
+                                    }))
                                   }
                                   onMealTypeChange={
                                     setEditingMealType
@@ -2112,6 +2412,9 @@ function FoodLogItem({
   editing,
   updating,
   editingQuantity,
+  editingFoodName,
+  editingUnit,
+  editingNutrients,
   editingMealType,
   editingNotes,
   editingRecordedAt,
@@ -2120,6 +2423,9 @@ function FoodLogItem({
   onCancelEdit,
   onSaveEdit,
   onQuantityChange,
+  onFoodNameChange,
+  onUnitChange,
+  onNutrientChange,
   onMealTypeChange,
   onNotesChange,
   onRecordedAtChange,
@@ -2133,6 +2439,12 @@ function FoodLogItem({
   updating: boolean;
 
   editingQuantity: string;
+
+  editingFoodName: string;
+
+  editingUnit: Unit;
+
+  editingNutrients: NutrientValues;
 
   editingMealType: MealType;
 
@@ -2151,6 +2463,12 @@ function FoodLogItem({
   onQuantityChange: (
     value: string
   ) => void;
+
+  onFoodNameChange: (value: string) => void;
+
+  onUnitChange: (value: Unit) => void;
+
+  onNutrientChange: (key: NutrientKey, value: string) => void;
 
   onMealTypeChange: (
     value: MealType
@@ -2181,35 +2499,71 @@ function FoodLogItem({
       >
         {editing ? (
           <Stack spacing={2}>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                fontWeight: 700,
-              }}
-            >
-              Edit{" "}
-              {entry.food_name}
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+              Edit food entry
             </Typography>
 
             <TextField
-              label="Quantity"
-              type="number"
-              value={
-                editingQuantity
-              }
-              onChange={(event) =>
-                onQuantityChange(
-                  event.target.value
-                )
-              }
+              label="Food or recipe name"
+              value={editingFoodName}
+              onChange={(event) => onFoodNameChange(event.target.value)}
               fullWidth
-              slotProps={{
-                htmlInput: {
-                  min: 0,
-                  step: "any",
-                },
-              }}
+              required
+              slotProps={{ htmlInput: { maxLength: 255 } }}
             />
+
+            <Grid container spacing={1.5}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Quantity"
+                  type="number"
+                  value={editingQuantity}
+                  onChange={(event) => onQuantityChange(event.target.value)}
+                  fullWidth
+                  slotProps={{ htmlInput: { min: 0, step: "any" } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <FormControl fullWidth>
+                  <InputLabel>Unit</InputLabel>
+                  <Select
+                    value={editingUnit}
+                    label="Unit"
+                    onChange={(event) => onUnitChange(event.target.value as Unit)}
+                  >
+                    <MenuItem value="g">grams (g)</MenuItem>
+                    <MenuItem value="kg">kilograms (kg)</MenuItem>
+                    <MenuItem value="serving">serving</MenuItem>
+                    <MenuItem value="piece">piece</MenuItem>
+                    <MenuItem value="ml">millilitres (ml)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.75 }}>
+                Nutrients for this entry
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+                Correct the saved totals using the food label or your recipe estimate.
+              </Typography>
+              <Grid container spacing={1.5}>
+                {nutrientFields.map(({ key, label, suffix }) => (
+                  <Grid key={key} size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      label={`${label} (${suffix})`}
+                      type="number"
+                      value={editingNutrients[key]}
+                      onChange={(event) => onNutrientChange(key, event.target.value)}
+                      fullWidth
+                      required
+                      slotProps={{ htmlInput: { min: 0, step: "any", inputMode: "decimal" } }}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
 
             <FormControl fullWidth>
               <InputLabel>

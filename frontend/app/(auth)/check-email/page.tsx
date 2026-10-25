@@ -12,16 +12,10 @@ import Typography from "@mui/material/Typography";
 import MarkEmailReadIcon from "@mui/icons-material/MarkEmailRead";
 import LoginIcon from "@mui/icons-material/Login";
 
-interface CheckEmailPageProps {
-  title?: string;
-}
-
-export default function CheckEmailPage({ title }: CheckEmailPageProps) {
+export default function CheckEmailPage() {
   const searchParams = useSearchParams();
 
-  // Fallback order: Explicit prop -> URL query param -> Default text
   const displayMessage =
-    title ||
     searchParams.get("message") ||
     "We've sent a verification link to your email address.";
 

@@ -18,9 +18,9 @@ export interface WeightStats {
   current_weight: number | null;
   starting_weight: number | null;
   target_weight: number | null;
-  weight_change: number;
+  weight_change: number | null;
   remaining_to_goal: number | null;
-  goal_progress_percent: number;
+  goal_progress_percent: number | null;
   entries: number;
   latest_recorded_at: string | null;
 }

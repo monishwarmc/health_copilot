@@ -14,7 +14,12 @@ import {
   Button,
   CircularProgress,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
+  Grid,
   InputLabel,
   MenuItem,
   Paper,
@@ -46,6 +51,7 @@ import MedicalServicesOutlinedIcon from "@mui/icons-material/MedicalServicesOutl
 import Image from "next/image";
 
 import ProfileImageCropper from "@/components/profile/ProfileImageCropper";
+import GoogleReauthButton from "@/components/profile/GoogleReauthButton";
 import { useAuth } from "@/context/AuthContext";
 import getErrorMessage from "@/lib/error";
 import { uploadImage } from "@/services/cloudinary.service";
@@ -127,6 +133,13 @@ const formatDateInput = (
   }
 
   return date.slice(0, 10);
+};
+
+const getTodayDateInput = () => {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
 };
 
 /* ============================================================
@@ -256,7 +269,6 @@ export default function ProfilePage() {
     profile,
     password,
     account,
-    googleVerify,
   } = useAuth();
 
   const isLocalUser =
@@ -276,6 +288,9 @@ export default function ProfilePage() {
     useState("");
 
   const [heightCm, setHeightCm] =
+    useState("");
+
+  const [targetWeightKg, setTargetWeightKg] =
     useState("");
 
   const [gender, setGender] =
@@ -338,6 +353,8 @@ export default function ProfilePage() {
   const [loadingDelete, setLoadingDelete] =
     useState(false);
 
+  const [googleDeleteOpen, setGoogleDeleteOpen] = useState(false);
+
   const [uploading, setUploading] =
     useState(false);
 
@@ -371,6 +388,12 @@ export default function ProfilePage() {
     setHeightCm(
       user.height_cm != null
         ? String(user.height_cm)
+        : ""
+    );
+
+    setTargetWeightKg(
+      user.target_weight_kg != null
+        ? String(user.target_weight_kg)
         : ""
     );
 
@@ -447,6 +470,12 @@ export default function ProfilePage() {
     : ""
 );
 
+    setTargetWeightKg(
+      user.target_weight_kg != null
+        ? String(user.target_weight_kg)
+        : ""
+    );
+
     setGender(
       user.gender ?? "other"
     );
@@ -501,6 +530,12 @@ export default function ProfilePage() {
     ? String(user.height_cm)
     : ""
 );
+
+      setTargetWeightKg(
+        user.target_weight_kg != null
+          ? String(user.target_weight_kg)
+          : ""
+      );
 
       setGender(
         user.gender ?? "other"
@@ -604,29 +639,39 @@ export default function ProfilePage() {
         return;
       }
 
+      if (fullName.trim().length < 2) {
+        toast.error("Your name must contain at least 2 characters.");
+        return;
+      }
+
       if (
         heightCm &&
-        Number.isNaN(
-          Number(heightCm)
-        )
+        (!Number.isFinite(Number(heightCm)) ||
+          Number(heightCm) <= 0 ||
+          Number(heightCm) > 300)
       ) {
-        toast.error(
-          "Height must be a valid number."
-        );
+        toast.error("Height must be between 0 and 300 cm.");
+        return;
+      }
+
+      if (
+        targetWeightKg &&
+        (!Number.isFinite(Number(targetWeightKg)) ||
+          Number(targetWeightKg) <= 0 ||
+          Number(targetWeightKg) > 1000)
+      ) {
+        toast.error("Target weight must be between 0 and 1000 kg.");
+        return;
+      }
+
+      if (dateOfBirth && dateOfBirth > getTodayDateInput()) {
+        toast.error("Date of birth cannot be in the future.");
         return;
       }
 
       setLoadingProfile(true);
 
       try {
-        /*
-         * IMPORTANT:
-         *
-         * Your AuthContext.profile() must be
-         * extended to accept these fields.
-         *
-         * See the note below this file.
-         */
         await profile({
           full_name:
             fullName.trim(),
@@ -635,14 +680,19 @@ export default function ProfilePage() {
             profilePicture || null,
 
           height_cm:
-          heightCm.trim()
+            heightCm.trim()
             ? Number(heightCm)
             : null,
+
+          target_weight_kg:
+            targetWeightKg.trim()
+              ? Number(targetWeightKg)
+              : null,
 
           gender,
 
           date_of_birth:
-            dateOfBirth,
+            dateOfBirth || null,
 
           activity_level:
             activityLevel,
@@ -653,12 +703,12 @@ export default function ProfilePage() {
             dietPreference,
 
           medical_conditions:
-            medicalConditions.trim(),
+            medicalConditions.trim() || null,
 
           food_allergies:
-            foodAllergies.trim(),
+            foodAllergies.trim() || null,
 
-          bio: bio.trim(),
+          bio: bio.trim() || null,
         });
 
         setEditing(false);
@@ -731,46 +781,41 @@ export default function ProfilePage() {
         return;
       }
 
-      const confirmed =
-        window.confirm(
-          "Are you sure you want to permanently delete your account? This action cannot be undone."
-        );
-
-      if (!confirmed) {
+      if (!isLocalUser) {
+        setGoogleDeleteOpen(true);
         return;
       }
 
+      const confirmed = window.confirm(
+        "Are you sure you want to permanently delete your account and health data? This action cannot be undone."
+      );
+      if (!confirmed) return;
+
       setLoadingDelete(true);
-
       try {
-        let message = "";
-
-        if (isLocalUser) {
-          message = await account(
-            deletePassword,
-            null
-          );
-        } else {
-          const idToken =
-            await googleVerify();
-
-          message = await account(
-            null,
-            idToken
-          );
-        }
-
+        const message = await account(deletePassword, null);
         toast.success(message);
-
         logout();
       } catch (error) {
-        toast.error(
-          getErrorMessage(error)
-        );
+        toast.error(getErrorMessage(error));
       } finally {
         setLoadingDelete(false);
       }
     };
+
+  const handleGoogleDeleteVerification = async (credential: string) => {
+    setLoadingDelete(true);
+    try {
+      const message = await account(null, credential);
+      toast.success(message);
+      setGoogleDeleteOpen(false);
+      logout();
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    } finally {
+      setLoadingDelete(false);
+    }
+  };
 
   /* ============================================================
      RENDER
@@ -1296,92 +1341,69 @@ export default function ProfilePage() {
           />
 
           {editing ? (
-            <Stack spacing={2.5}>
-              <TextField
-                label="Height"
-                value={heightCm}
-                onChange={(event) =>
-                  setHeightCm(event.target.value)
-                }
-                fullWidth
-                type="number"
-                slotProps={{
-                  htmlInput: {
-                    min: 50,
-                    max: 300,
-                  },
-                  input: {
-                    endAdornment: (
-                      <Typography
-                        color="text.secondary"
-                        sx={{ ml: 1 }}
-                      >
-                        cm
-                      </Typography>
-                    ),
-                  },
-                }}
-              />
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Height"
+                  value={heightCm}
+                  onChange={(event) => setHeightCm(event.target.value)}
+                  fullWidth
+                  type="number"
+                  helperText="Centimeters"
+                  slotProps={{ htmlInput: { min: 1, max: 300, step: 0.1 } }}
+                />
+              </Grid>
 
-              <FormControl fullWidth>
-                <InputLabel>
-                  Gender
-                </InputLabel>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Target weight"
+                  value={targetWeightKg}
+                  onChange={(event) => setTargetWeightKg(event.target.value)}
+                  fullWidth
+                  type="number"
+                  helperText="Kilograms; optional"
+                  slotProps={{ htmlInput: { min: 1, max: 1000, step: 0.1 } }}
+                />
+              </Grid>
 
-                <Select
-                  value={gender}
-                  label="Gender"
-                  onChange={(event) =>
-                    setGender(
-                      event.target
-                        .value as Gender
-                    )
-                  }
-                >
-                  {(
-                    Object.keys(
-                      genderLabels
-                    ) as Gender[]
-                  ).map((value) => (
-                    <MenuItem
-                      key={value}
-                      value={value}
-                    >
-                      {
-                        genderLabels[
-                          value
-                        ]
-                      }
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <FormControl fullWidth>
+                  <InputLabel>Gender</InputLabel>
+                  <Select
+                    value={gender}
+                    label="Gender"
+                    onChange={(event) => setGender(event.target.value as Gender)}
+                  >
+                    {(Object.keys(genderLabels) as Gender[]).map((value) => (
+                      <MenuItem key={value} value={value}>
+                        {genderLabels[value]}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
 
-              <TextField
-                label="Date of birth"
-                type="date"
-                value={dateOfBirth}
-                onChange={(event) =>
-                  setDateOfBirth(
-                    event.target
-                      .value
-                  )
-                }
-                fullWidth
-                slotProps={{
-                  inputLabel: {
-                    shrink: true,
-                  },
-                }}
-              />
-            </Stack>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Date of birth"
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(event) => setDateOfBirth(event.target.value)}
+                  fullWidth
+                  slotProps={{
+                    htmlInput: { max: getTodayDateInput() },
+                    inputLabel: { shrink: true },
+                  }}
+                />
+              </Grid>
+            </Grid>
           ) : (
             <Box
               sx={{
                 display: "grid",
                 gridTemplateColumns: {
                   xs: "1fr",
-                  sm: "repeat(3, 1fr)",
+                  sm: "repeat(2, 1fr)",
                 },
                 gap: 3,
               }}
@@ -1394,6 +1416,16 @@ export default function ProfilePage() {
                 value={
                   user?.height_cm
                     ? `${user.height_cm} cm`
+                    : "—"
+                }
+              />
+
+              <InfoItem
+                icon={<MonitorWeightOutlinedIcon fontSize="small" />}
+                label="Target weight"
+                value={
+                  user?.target_weight_kg != null
+                    ? `${user.target_weight_kg} kg`
                     : "—"
                 }
               />
@@ -2045,6 +2077,30 @@ export default function ProfilePage() {
         }}
         onSave={handleCropComplete}
       />
+
+      <Dialog
+        open={googleDeleteOpen}
+        onClose={() => !loadingDelete && setGoogleDeleteOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Confirm account deletion</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+              To permanently delete your account and all health records, verify your identity with the Google account connected to this profile.
+            </Typography>
+            <GoogleReauthButton
+              onCredential={handleGoogleDeleteVerification}
+              disabled={loadingDelete}
+            />
+            {loadingDelete && <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>Deleting your account…</Typography>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setGoogleDeleteOpen(false)} disabled={loadingDelete}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import settings
 from app.api.auth import router as auth_router
 from app.api.profile import router as profile_router
 from app.api.weight import router as weight_router
@@ -18,13 +19,9 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "*",
-        "https://health-copilot-rouge.vercel.app",
-        # Local development
+        settings.FRONTEND_URL.rstrip("/"),
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-
-        # Production frontend
         "https://health-copilot-rouge.vercel.app",
     ],
     allow_credentials=True,

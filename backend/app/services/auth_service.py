@@ -365,10 +365,9 @@ class AuthService:
     ) -> UserResponse:
         if not current_user.is_verified:
             raise EmailNotVerifiedException()
-        if request.full_name is not None:
-            current_user.full_name = request.full_name
-        if request.profile_picture is not None:
-            current_user.profile_picture = request.profile_picture
+        for field, value in request.model_dump(exclude_unset=True).items():
+            setattr(current_user, field, value)
+
         db.commit()
         db.refresh(current_user)
         return UserResponse.model_validate(current_user)
